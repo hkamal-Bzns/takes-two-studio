@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ADLER — Fashion & Beauty Photographer</title>
-  <meta name="description" content="ADLER Studio — High-end fashion & beauty photography. Editorial, beauty, glamour and advertising portfolios." />
+  <title>Takestwo Studio — Advertising &amp; Food &amp; Beverage Photography</title>
+  <meta name="description" content="Takestwo Studio — A Cairo-based photography studio by Mohamed Medhat & Ahmed Okasha. Advertising campaigns, TV commercials, food & beverage, and product stills." />
+  <link rel="icon" href="/brand/logo.webp" type="image/webp" />
 
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -22,9 +23,6 @@
             serif: ['"Playfair Display"', 'Georgia', 'serif'],
             sans: ['Montserrat', 'Helvetica', 'Arial', 'sans-serif'],
           },
-          letterSpacing: {
-            ultra: '0.35em',
-          }
         }
       }
     }
@@ -40,7 +38,6 @@
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
     }
-
     .font-serif { font-family: 'Playfair Display', Georgia, serif; }
 
     /* ---------- SPA view routing ---------- */
@@ -57,10 +54,7 @@
     }
 
     /* ---------- Masonry via CSS columns ---------- */
-    .masonry {
-      column-count: 1;
-      column-gap: 0;
-    }
+    .masonry { column-count: 1; column-gap: 0; }
     @media (min-width: 640px)  { .masonry { column-count: 2; } }
     @media (min-width: 1024px) { .masonry { column-count: 3; } }
     @media (min-width: 1536px) { .masonry { column-count: 4; } }
@@ -80,10 +74,8 @@
     .nav-link::after {
       content: '';
       position: absolute;
-      left: 0;
-      bottom: 0;
-      width: 0;
-      height: 1px;
+      left: 0; bottom: 0;
+      width: 0; height: 1px;
       background: #000;
       transition: width 0.4s var(--ease);
     }
@@ -93,30 +85,22 @@
 
     /* ---------- Portfolios dropdown (CSS-driven) ---------- */
     .dropdown-menu {
-      opacity: 0;
-      visibility: hidden;
+      opacity: 0; visibility: hidden;
       transform: translateY(10px);
       transition: opacity 0.3s var(--ease), transform 0.3s var(--ease), visibility 0.3s;
     }
     .dropdown:hover .dropdown-menu,
     .dropdown:focus-within .dropdown-menu {
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0);
+      opacity: 1; visibility: visible; transform: translateY(0);
     }
     .dropdown-item { transition: color 0.3s var(--ease), padding-left 0.3s var(--ease); }
     .dropdown-item:hover { color: rgba(0,0,0,0.5); padding-left: 6px; }
 
     /* ---------- Gallery hover overlay ---------- */
-    .gallery-item .overlay {
-      opacity: 0;
-      transition: opacity 0.5s var(--ease);
-    }
+    .gallery-item .overlay { opacity: 0; transition: opacity 0.5s var(--ease); }
     .gallery-item:hover .overlay { opacity: 1; }
-    .gallery-item img {
-      transition: transform 1.2s var(--ease), filter 0.6s var(--ease);
-    }
-    .gallery-item:hover img { transform: scale(1.04); filter: brightness(0.7); }
+    .gallery-item img { transition: transform 1.2s var(--ease), filter 0.6s var(--ease); }
+    .gallery-item:hover img { transform: scale(1.04); filter: brightness(0.55); }
     .gallery-item .campaign-title {
       transform: translateY(12px);
       transition: transform 0.6s var(--ease);
@@ -125,8 +109,7 @@
 
     /* ---------- Lightbox ---------- */
     .lightbox {
-      opacity: 0;
-      pointer-events: none;
+      opacity: 0; pointer-events: none;
       transition: opacity 0.45s var(--ease);
     }
     .lightbox.open { opacity: 1; pointer-events: auto; }
@@ -138,12 +121,8 @@
     .lb-fade { transition: opacity 0.35s var(--ease); }
 
     /* ---------- Mobile menu ---------- */
-    .mobile-menu {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.5s var(--ease);
-    }
-    .mobile-menu.open { max-height: 480px; }
+    .mobile-menu { max-height: 0; overflow: hidden; transition: max-height 0.5s var(--ease); }
+    .mobile-menu.open { max-height: 520px; }
 
     /* ---------- Contact form (bottom-border inputs) ---------- */
     .field {
@@ -157,10 +136,7 @@
       font-weight: 300;
       transition: border-color 0.3s var(--ease);
     }
-    .field:focus {
-      outline: none;
-      border-bottom-color: #000;
-    }
+    .field:focus { outline: none; border-bottom-color: #000; }
     .field::placeholder { color: rgba(0,0,0,0.35); font-weight: 300; }
 
     /* ---------- Scrollbar ---------- */
@@ -173,13 +149,10 @@
     #app { animation: appIn 0.8s var(--ease) both; }
     @keyframes appIn { from { opacity: 0; } to { opacity: 1; } }
 
-    /* Lazy fade-up for sections */
     .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
     .reveal.in { opacity: 1; transform: translateY(0); }
 
-    /* Image loading shimmer */
-    .img-skeleton { background: linear-gradient(90deg, #f2f2f2 25%, #e6e6e6 37%, #f2f2f2 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; }
-    @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+    .logo-invert { filter: invert(1) brightness(2); }
   </style>
 </head>
 
@@ -188,12 +161,14 @@
 
     <!-- ===================== HEADER ===================== -->
     <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-black/5">
-      <div class="flex items-center justify-between px-5 md:px-12 py-5">
-        <!-- Logo -->
-        <a href="#" onclick="showView('portfolio-view'); return false;" class="flex items-baseline gap-3 group">
-          <span class="font-serif text-2xl md:text-3xl tracking-wide leading-none">ADLER</span>
-          <span class="hidden sm:inline-block w-px h-4 bg-black/25 self-center"></span>
-          <span class="hidden sm:inline text-[10px] tracking-[0.3em] uppercase text-black/50 font-light">Fashion &amp; Beauty Photographer</span>
+      <div class="flex items-center justify-between px-5 md:px-12 py-4 md:py-5">
+        <!-- Logo + tagline -->
+        <a href="#" onclick="showView('portfolio-view'); filterPortfolio('overview'); return false;" class="flex items-center gap-3 md:gap-4 group">
+          <img src="/brand/logo.webp" alt="Takestwo Studio" class="h-7 md:h-9 w-auto" />
+          <span class="hidden sm:inline-block w-px h-4 bg-black/20 self-center"></span>
+          <span class="hidden sm:inline text-[10px] tracking-[0.28em] uppercase text-black/50 font-light leading-tight">
+            Advertising<br/>&amp; Food &amp; Beverage
+          </span>
         </a>
 
         <!-- Desktop nav -->
@@ -203,13 +178,10 @@
               Portfolios
               <svg class="w-2.5 h-2.5 opacity-50" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1"/></svg>
             </button>
-            <div class="dropdown-menu absolute top-full right-0 mt-5 bg-white border border-black/10 py-4 min-w-[200px] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.25)]">
-              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('editorial'); return false;">Editorial</a>
-              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('beauty'); return false;">Beauty</a>
-              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('glamour'); return false;">Glamour</a>
+            <div class="dropdown-menu absolute top-full right-0 mt-5 bg-white border border-black/10 py-4 min-w-[210px] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.25)]">
+              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('overview'); return false;">Overview</a>
               <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('advertising'); return false;">Advertising</a>
-              <div class="border-t border-black/10 my-2"></div>
-              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer text-black/50" onclick="filterPortfolio('all'); return false;">All Work</a>
+              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('food-beverage'); return false;">Food &amp; Beverage</a>
             </div>
           </div>
           <a class="nav-link" onclick="showView('about-view'); return false;">About</a>
@@ -218,20 +190,18 @@
 
         <!-- Mobile hamburger -->
         <button class="md:hidden flex flex-col gap-[5px] p-2" onclick="toggleMobileMenu()" aria-label="Menu">
-          <span class="block w-6 h-px bg-black transition-transform"></span>
-          <span class="block w-6 h-px bg-black transition-opacity"></span>
-          <span class="block w-6 h-px bg-black transition-transform"></span>
+          <span class="block w-6 h-px bg-black"></span>
+          <span class="block w-6 h-px bg-black"></span>
+          <span class="block w-6 h-px bg-black"></span>
         </button>
       </div>
 
       <!-- Mobile menu -->
       <div id="mobile-menu" class="mobile-menu md:hidden border-t border-black/5 bg-white">
         <div class="px-5 py-4 flex flex-col text-[12px] tracking-[0.22em] uppercase font-light">
-          <a class="py-3 border-b border-black/5 cursor-pointer" onclick="filterPortfolio('all'); closeMobileMenu();">Portfolios — All</a>
-          <a class="py-3 pl-4 border-b border-black/5 cursor-pointer text-black/60" onclick="filterPortfolio('editorial'); closeMobileMenu();">Editorial</a>
-          <a class="py-3 pl-4 border-b border-black/5 cursor-pointer text-black/60" onclick="filterPortfolio('beauty'); closeMobileMenu();">Beauty</a>
-          <a class="py-3 pl-4 border-b border-black/5 cursor-pointer text-black/60" onclick="filterPortfolio('glamour'); closeMobileMenu();">Glamour</a>
+          <a class="py-3 border-b border-black/5 cursor-pointer" onclick="filterPortfolio('overview'); closeMobileMenu();">Portfolios — Overview</a>
           <a class="py-3 pl-4 border-b border-black/5 cursor-pointer text-black/60" onclick="filterPortfolio('advertising'); closeMobileMenu();">Advertising</a>
+          <a class="py-3 pl-4 border-b border-black/5 cursor-pointer text-black/60" onclick="filterPortfolio('food-beverage'); closeMobileMenu();">Food &amp; Beverage</a>
           <a class="py-3 border-b border-black/5 cursor-pointer" onclick="showView('about-view'); closeMobileMenu();">About</a>
           <a class="py-3 cursor-pointer" onclick="showView('contact-view'); closeMobileMenu();">Contact</a>
         </div>
@@ -243,22 +213,20 @@
 
       <!-- ========== VIEW A: PORTFOLIO ========== -->
       <section id="portfolio-view" class="view active">
-        <!-- Portfolio intro -->
         <div class="px-5 md:px-12 pt-14 md:pt-20 pb-8 md:pb-10 max-w-screen-2xl">
           <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
-              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-4">Selected Works · 2019—2024</p>
-              <h1 class="font-serif text-4xl md:text-6xl leading-[1.05]">A study in <em class="text-black/70">light</em>,<br/>form &amp; stillness.</h1>
+              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-4">Selected Works · 2017—2024</p>
+              <h1 class="font-serif text-4xl md:text-6xl leading-[1.05]">Two perspectives.<br/>One obsession with<br/><em class="text-black/70">the perfect still.</em></h1>
             </div>
             <div class="flex items-center gap-5 text-[10px] tracking-[0.3em] uppercase text-black/40">
-              <span id="filter-label">All Portfolios</span>
+              <span id="filter-label">Overview</span>
               <span class="w-8 h-px bg-black/20"></span>
-              <span id="filter-count">15</span>
+              <span id="filter-count">14</span>
             </div>
           </div>
         </div>
 
-        <!-- Masonry grid -->
         <div id="masonry-grid" class="masonry w-full"></div>
       </section>
 
@@ -269,47 +237,40 @@
             <!-- Left: image -->
             <div class="reveal">
               <div class="overflow-hidden">
-                <img
-                  src="https://images.unsplash.com/photo-1487412720507-e7ab37603c6a?auto=format&fit=crop&w=900&q=80"
-                  alt="Portrait of the photographer"
-                  onerror="this.onerror=null;this.src='https://picsum.photos/seed/adlerportrait/900/1100';"
-                  class="w-full object-cover aspect-[4/5]" />
+                <img src="/brand/about.webp" alt="Takestwo Studio founders — Mohamed Medhat & Ahmed Okasha" class="w-full h-auto object-cover" />
               </div>
-              <p class="mt-5 text-[10px] tracking-[0.3em] uppercase text-black/40">New York · Paris · Milan</p>
+              <p class="mt-5 text-[10px] tracking-[0.3em] uppercase text-black/40">Cairo · Egypt</p>
             </div>
 
             <!-- Right: content -->
             <div class="reveal" style="transition-delay:0.15s;">
-              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">The Artist</p>
-              <h2 class="font-serif text-4xl md:text-5xl leading-[1.1] mb-8">About the Artist</h2>
+              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">The Studio</p>
+              <h2 class="font-serif text-4xl md:text-5xl leading-[1.1] mb-8">About Takestwo</h2>
               <div class="space-y-6 text-[15px] leading-[1.9] text-black/75 font-light max-w-md">
-                <p>For over a decade, Adler has defined a signature aesthetic — clean, luminous, and unapologetically modern. Her work moves between the intimacy of a beauty close-up and the grand choreography of an editorial story, always guided by a singular devotion to the human face.</p>
-                <p>Shooting between studios in New York and Paris, she has crafted visual languages for the houses that shape how the world sees beauty — translating mood into image, and image into desire.</p>
+                <p>Takestwo Studio was founded by two creative Egyptian photographers — <span class="text-black">Mohamed Medhat</span> and <span class="text-black">Ahmed Okasha</span> — who embarked on this artistic journey from the very beginning of their studies in the visual arts.</p>
+                <p>Photography has always been their favorite medium; they have dedicated themselves to mastering the craft since 2017. After exploring many genres, they discovered their true calling in creating compelling still visuals for advertising campaigns, television commercials, and food &amp; beverage imagery.</p>
+                <p>As a team of two, they blend artistic perspective with technical precision — completing one another's strengths and pushing the boundaries of creativity while ensuring attention to detail in every project.</p>
               </div>
 
-              <!-- Clients -->
+              <!-- Capabilities -->
               <div class="mt-12">
-                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">Selected Clients</p>
+                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">Capabilities</p>
                 <ul class="grid grid-cols-2 gap-y-3 gap-x-8 font-serif text-lg italic text-black/85">
-                  <li>Vogue</li>
-                  <li>Harper's Bazaar</li>
-                  <li>Chanel</li>
-                  <li>Dior</li>
-                  <li>Canon</li>
-                  <li>Numéro</li>
-                  <li>Saint Laurent</li>
-                  <li>Elle</li>
+                  <li>Advertising Campaigns</li>
+                  <li>TV Commercials</li>
+                  <li>Food &amp; Beverage</li>
+                  <li>Product Stills</li>
+                  <li>Automotive</li>
+                  <li>Beverage</li>
+                  <li>Creative Direction</li>
+                  <li>Post-Production</li>
                 </ul>
               </div>
 
-              <!-- Recognition -->
+              <!-- Philosophy -->
               <div class="mt-12 pt-8 border-t border-black/10">
-                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">Recognition</p>
-                <div class="space-y-3 text-[13px] font-light text-black/70">
-                  <div class="flex justify-between border-b border-black/5 pb-3"><span>Hasselblad Masters — Fashion</span><span class="text-black/40">2023</span></div>
-                  <div class="flex justify-between border-b border-black/5 pb-3"><span>One Show — Gold Pencil</span><span class="text-black/40">2022</span></div>
-                  <div class="flex justify-between border-b border-black/5 pb-3"><span>Communication Arts Annual</span><span class="text-black/40">2021</span></div>
-                </div>
+                <p class="font-serif text-2xl md:text-3xl italic leading-snug text-black/85">"Two perspectives.<br/>One frame."</p>
+                <p class="mt-4 text-[10px] tracking-[0.3em] uppercase text-black/40">Takestwo Studio · Est. 2017</p>
               </div>
             </div>
           </div>
@@ -321,45 +282,62 @@
         <div class="px-5 md:px-6 py-20 md:py-28 max-w-xl mx-auto w-full">
           <div class="text-center mb-14 reveal">
             <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-5">Get in Touch</p>
-            <h2 class="font-serif text-4xl md:text-5xl leading-tight">Let's create<br/><em>something timeless.</em></h2>
+            <h2 class="font-serif text-4xl md:text-5xl leading-tight">For bookings<br/><em>&amp; inquiries.</em></h2>
           </div>
 
           <!-- Contact details -->
           <div class="space-y-8 mb-16 reveal" style="transition-delay:0.1s;">
             <div class="text-center">
-              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Studio</p>
-              <a href="mailto:studio@adlerphotography.com" class="text-lg md:text-xl font-light hover:opacity-60 transition-opacity">studio@adlerphotography.com</a>
+              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">General</p>
+              <a href="mailto:info@takestwostudio.com" class="text-lg md:text-xl font-light hover:opacity-60 transition-opacity">info@takestwostudio.com</a>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 text-center">
+              <div>
+                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Bookings — Mohamed</p>
+                <a href="mailto:M.medhat@takestwostudio.com" class="text-sm font-light text-black/70 hover:opacity-60 transition-opacity break-all">M.medhat@takestwostudio.com</a>
+              </div>
+              <div>
+                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Bookings — Okasha</p>
+                <a href="mailto:Okasha@takestwostudio.com" class="text-sm font-light text-black/70 hover:opacity-60 transition-opacity break-all">Okasha@takestwostudio.com</a>
+              </div>
             </div>
             <div class="grid grid-cols-2 gap-8 text-center">
               <div>
-                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">New York</p>
-                <p class="text-sm font-light text-black/70">+1 212 555 0184</p>
+                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Cairo, Egypt</p>
+                <a href="tel:+201100900617" class="block text-sm font-light text-black/70 hover:opacity-60 transition-opacity">+20 110 090 0617</a>
+                <a href="tel:+201143219416" class="block text-sm font-light text-black/70 hover:opacity-60 transition-opacity">+20 114 321 9416</a>
               </div>
               <div>
-                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Paris</p>
-                <p class="text-sm font-light text-black/70">+33 1 55 02 0184</p>
+                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Riyadh, KSA</p>
+                <a href="tel:+966567422977" class="block text-sm font-light text-black/70 hover:opacity-60 transition-opacity">+966 56 742 2977</a>
               </div>
             </div>
             <div class="text-center pt-2">
-              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Representation</p>
-              <p class="text-sm font-light text-black/70">Art Department — <span class="italic">J. Mercer</span></p>
-              <a href="mailto:bookings@artdept.com" class="text-sm font-light text-black/70 hover:opacity-60 transition-opacity">bookings@artdept.com</a>
+              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Studio Management</p>
+              <p class="text-sm font-light text-black/70">Hazem Kamal</p>
+              <a href="mailto:Hazem@takestwostudio.com" class="text-sm font-light text-black/70 hover:opacity-60 transition-opacity">Hazem@takestwostudio.com</a>
             </div>
           </div>
 
           <!-- Form -->
-          <form id="contact-form" class="space-y-9 reveal" style="transition-delay:0.2s;" onsubmit="return submitForm(event);">
+          <form id="contact-form" class="space-y-8 reveal" style="transition-delay:0.2s;" onsubmit="return submitForm(event);">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              <div>
+                <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="firstname">First Name</label>
+                <input id="firstname" name="firstname" type="text" class="field" placeholder="First name" required />
+              </div>
+              <div>
+                <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="lastname">Last Name</label>
+                <input id="lastname" name="lastname" type="text" class="field" placeholder="Last name" required />
+              </div>
+            </div>
             <div>
-              <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="name">Name</label>
-              <input id="name" name="name" type="text" class="field" placeholder="Your full name" required />
+              <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="phone">Phone Number</label>
+              <input id="phone" name="phone" type="tel" class="field" placeholder="+20 ..." required />
             </div>
             <div>
               <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="email">Email</label>
               <input id="email" name="email" type="email" class="field" placeholder="you@studio.com" required />
-            </div>
-            <div>
-              <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="subject">Subject</label>
-              <input id="subject" name="subject" type="text" class="field" placeholder="Editorial / Campaign / Other" required />
             </div>
             <div>
               <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="message">Message</label>
@@ -383,13 +361,15 @@
       <div class="px-5 md:px-12 py-14">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8 max-w-screen-2xl">
           <div>
-            <h3 class="font-serif text-2xl mb-3">ADLER</h3>
-            <p class="text-[11px] tracking-[0.25em] uppercase text-white/50 font-light">Fashion &amp; Beauty Photographer</p>
+            <img src="/brand/logo.webp" alt="Takestwo Studio" class="h-9 w-auto logo-invert mb-4" />
+            <p class="text-[11px] tracking-[0.25em] uppercase text-white/50 font-light leading-relaxed">Advertising &amp; Food<br/>&amp; Beverage Photography</p>
           </div>
           <div>
             <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-4">Navigate</p>
             <ul class="space-y-2 text-sm font-light">
-              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="showView('portfolio-view'); return false;">Portfolios</a></li>
+              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="filterPortfolio('overview'); return false;">Overview</a></li>
+              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="filterPortfolio('advertising'); return false;">Advertising</a></li>
+              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="filterPortfolio('food-beverage'); return false;">Food &amp; Beverage</a></li>
               <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="showView('about-view'); return false;">About</a></li>
               <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="showView('contact-view'); return false;">Contact</a></li>
             </ul>
@@ -397,15 +377,15 @@
           <div>
             <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-4">Connect</p>
             <ul class="space-y-2 text-sm font-light">
-              <li><a href="#" class="hover:text-white/60 transition-colors">Instagram</a></li>
-              <li><a href="#" class="hover:text-white/60 transition-colors">Behance</a></li>
-              <li><a href="#" class="hover:text-white/60 transition-colors">LinkedIn</a></li>
+              <li><a href="mailto:info@takestwostudio.com" class="hover:text-white/60 transition-colors break-all">info@takestwostudio.com</a></li>
+              <li class="text-white/60">Cairo, Egypt</li>
+              <li class="text-white/60">Riyadh, KSA</li>
             </ul>
           </div>
         </div>
         <div class="mt-12 pt-6 border-t border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-[10px] tracking-[0.25em] uppercase text-white/40 font-light">
-          <span>© 2024 Adler Studio. All Rights Reserved.</span>
-          <span>New York · Paris · Milan</span>
+          <span>© Takestwo Studio. All Rights Reserved.</span>
+          <span>Cairo · Riyadh · Middle East</span>
         </div>
       </div>
     </footer>
@@ -415,74 +395,58 @@
   <!-- ===================== LIGHTBOX ===================== -->
   <div id="lightbox" class="lightbox fixed inset-0 z-50 bg-black/95 flex items-center justify-center" onclick="if(event.target===this)closeLightbox()">
     <button onclick="closeLightbox()" aria-label="Close" class="absolute top-5 right-5 md:top-8 md:right-10 text-white/80 hover:text-white text-4xl md:text-5xl font-light leading-none transition-colors">×</button>
-
     <button onclick="prevImage()" aria-label="Previous" class="absolute left-3 md:left-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl md:text-6xl font-light leading-none transition-colors px-2">‹</button>
-
     <figure class="flex flex-col items-center max-w-[90vw] max-h-[90vh]">
       <img id="lightbox-img" class="lb-img max-h-[82vh] max-w-[88vw] object-contain" src="" alt="" />
       <figcaption id="lightbox-caption" class="lb-fade mt-5 text-white/70 text-[10px] tracking-[0.3em] uppercase text-center"></figcaption>
     </figure>
-
     <button onclick="nextImage()" aria-label="Next" class="absolute right-3 md:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl md:text-6xl font-light leading-none transition-colors px-2">›</button>
-
     <div id="lightbox-counter" class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/40 text-[10px] tracking-[0.3em] uppercase"></div>
   </div>
 
   <!-- ===================== SCRIPT ===================== -->
   <script>
-    /* ---------- Gallery data ---------- */
+    /* ---------- Gallery data (real Takestwo Studio work) ---------- */
     const galleryData = [
-      { id: '1492684223066-81342ee5ff30', category: 'editorial',   title: 'Vogue Italia',          aspect: '3 / 4' },
-      { id: '1509631179647-0177331693ae', category: 'beauty',      title: 'Chanel Beauty',         aspect: '4 / 5' },
-      { id: '1485231183945-fffde7cc051e', category: 'glamour',     title: "Harper's Bazaar",        aspect: '3 / 4' },
-      { id: '1524504388940-b1c1722653e1', category: 'editorial',   title: 'Dior SS24',             aspect: '4 / 3' },
-      { id: '1502323777036-f29e3972d82f', category: 'glamour',     title: 'Elle Magazine',         aspect: '4 / 5' },
-      { id: '1496440737103-cd596325d314', category: 'glamour',     title: 'Saint Laurent',         aspect: '3 / 4' },
-      { id: '1539109136881-3be0616acf4b', category: 'advertising', title: 'Bvlgari Campaign',       aspect: '4 / 3' },
-      { id: '1488161628813-04466f872be2', category: 'editorial',   title: 'Numéro',                aspect: '3 / 4' },
-      { id: '1485875437342-9b39470b3d95', category: 'advertising', title: 'Louis Vuitton',         aspect: '4 / 5' },
-      { id: '1492288991661-058aa541ff43', category: 'glamour',     title: 'Marie Claire',          aspect: '3 / 4' },
-      { id: '1469334031218-e382a71b716b', category: 'advertising', title: 'Prada Campaign',        aspect: '4 / 3' },
-      { id: '1531123897727-8f129e1688ce', category: 'editorial',   title: 'W Magazine',            aspect: '4 / 5' },
-      { id: '1515886657613-9f3515b0c78f', category: 'beauty',      title: 'Tom Ford Beauty',       aspect: '3 / 4' },
-      { id: '1567401893414-76b7b1e5a7a5', category: 'beauty',      title: 'NARS Cosmetics',        aspect: '4 / 5' },
-      { id: '1542596594-649edbc13630', category: 'beauty',        title: 'M·A·C Studio',          aspect: '3 / 4' },
+      { src: '/shoots/ad1.webp', cat: 'advertising',   title: 'Still — 01',    ar: '1600 / 933'  },
+      { src: '/shoots/fb1.jpg',  cat: 'food-beverage', title: 'Cover Story',   ar: '1600 / 1599' },
+      { src: '/shoots/ad2.webp', cat: 'advertising',   title: 'Still — 02',    ar: '1600 / 1111' },
+      { src: '/shoots/fb2.jpg',  cat: 'food-beverage', title: 'Dreem',         ar: '1600 / 1189' },
+      { src: '/shoots/ad3.webp', cat: 'advertising',   title: 'Automotive',    ar: '1600 / 1004' },
+      { src: '/shoots/fb3.jpg',  cat: 'food-beverage', title: 'Beverage — 01', ar: '1600 / 1104' },
+      { src: '/shoots/ad4.webp', cat: 'advertising',   title: 'Still — 03',    ar: '1600 / 1124' },
+      { src: '/shoots/fb4.jpg',  cat: 'food-beverage', title: 'Studio — 01',   ar: '1600 / 1068' },
+      { src: '/shoots/ad5.webp', cat: 'advertising',   title: 'Still — 04',    ar: '1600 / 869'  },
+      { src: '/shoots/fb5.jpg',  cat: 'food-beverage', title: 'French Cocoa',  ar: '1600 / 1066' },
+      { src: '/shoots/ad6.webp', cat: 'advertising',   title: 'Still — 05',    ar: '1600 / 1199' },
+      { src: '/shoots/fb6.jpg',  cat: 'food-beverage', title: 'Cover II',      ar: '1600 / 1066' },
+      { src: '/shoots/ad7.webp', cat: 'advertising',   title: 'Still — 06',    ar: '1600 / 1074' },
+      { src: '/shoots/fb7.jpg',  cat: 'food-beverage', title: 'Editorial',     ar: '1600 / 1183' },
     ];
 
-    const imgThumb = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=900&q=80`;
-    const imgFull  = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1600&q=85`;
-    const imgFallback = (id) => `https://picsum.photos/seed/adler${id}/900/1100`;
-
-    let currentGallery = [];   // currently rendered (visible) items
-    let currentFilter  = 'all';
+    let currentGallery = [];
+    let currentFilter = 'overview';
     let lbIndex = 0;
 
     /* ---------- Render masonry ---------- */
-    function renderGallery(filter = 'all') {
+    function renderGallery(filter = 'overview') {
       const grid = document.getElementById('masonry-grid');
       grid.innerHTML = '';
       currentGallery = [];
 
-      const items = filter === 'all'
+      const items = filter === 'overview'
         ? galleryData
-        : galleryData.filter(g => g.category === filter);
+        : galleryData.filter(g => g.cat === filter);
 
       items.forEach((item, i) => {
-        const thumb = imgThumb(item.id);
         const figure = document.createElement('figure');
         figure.className = 'gallery-item masonry-item relative overflow-hidden cursor-pointer bg-neutral-100';
-        figure.style.aspectRatio = item.aspect;
+        figure.style.aspectRatio = item.ar;
 
         figure.innerHTML = `
-          <img src="${thumb}"
-               alt="${item.title}"
-               loading="lazy"
-               onerror="this.onerror=null;this.src='${imgFallback(item.id)}';"
-               class="w-full h-full object-cover block" />
+          <img src="${item.src}" alt="${item.title} — Takestwo Studio" loading="lazy" class="w-full h-full object-cover block" />
           <div class="overlay absolute inset-0 bg-black/60 flex items-center justify-center">
-            <span class="campaign-title text-white text-[11px] tracking-[0.35em] uppercase font-light text-center px-4">
-              ${item.title}
-            </span>
+            <span class="campaign-title text-white text-[11px] tracking-[0.35em] uppercase font-light text-center px-4">${item.title}</span>
           </div>
         `;
 
@@ -491,10 +455,10 @@
         currentGallery.push(item);
       });
 
-      // Update header counters
+      const labelMap = { overview: 'Overview', advertising: 'Advertising', 'food-beverage': 'Food & Beverage' };
       const label = document.getElementById('filter-label');
       const count = document.getElementById('filter-count');
-      if (label) label.textContent = filter === 'all' ? 'All Portfolios' : (filter.charAt(0).toUpperCase() + filter.slice(1));
+      if (label) label.textContent = labelMap[filter] || filter;
       if (count) count.textContent = currentGallery.length;
     }
 
@@ -510,18 +474,13 @@
     function showView(viewId) {
       const views = document.querySelectorAll('.view');
       views.forEach(v => v.classList.remove('active'));
-
       const target = document.getElementById(viewId);
       if (!target) return;
-
-      // small delay so the fade-out/fade-in feels intentional
       requestAnimationFrame(() => {
         target.classList.add('active');
         runReveals(target);
-        window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+        window.scrollTo({ top: 0, behavior: 'auto' });
       });
-
-      // sync nav active states
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('is-active'));
       if (viewId === 'portfolio-view') {
         const links = document.querySelectorAll('.nav-link');
@@ -530,40 +489,30 @@
       closeMobileMenu();
     }
 
-    /* ---------- Reveal-on-scroll for sections ---------- */
+    /* ---------- Reveal-on-scroll ---------- */
     function runReveals(scope = document) {
       const els = scope.querySelectorAll('.reveal');
       els.forEach(el => {
         el.classList.remove('in');
-        requestAnimationFrame(() => {
-          setTimeout(() => el.classList.add('in'), 50);
-        });
+        requestAnimationFrame(() => { setTimeout(() => el.classList.add('in'), 50); });
       });
     }
 
     /* ---------- Mobile menu ---------- */
-    function toggleMobileMenu() {
-      document.getElementById('mobile-menu').classList.toggle('open');
-    }
-    function closeMobileMenu() {
-      document.getElementById('mobile-menu').classList.remove('open');
-    }
+    function toggleMobileMenu() { document.getElementById('mobile-menu').classList.toggle('open'); }
+    function closeMobileMenu() { document.getElementById('mobile-menu').classList.remove('open'); }
 
     /* ---------- Lightbox ---------- */
     function openLightbox(index) {
       lbIndex = index;
-      const lb = document.getElementById('lightbox');
-      lb.classList.add('open');
+      document.getElementById('lightbox').classList.add('open');
       document.body.style.overflow = 'hidden';
       updateLightbox();
     }
-
     function closeLightbox() {
-      const lb = document.getElementById('lightbox');
-      lb.classList.remove('open');
+      document.getElementById('lightbox').classList.remove('open');
       document.body.style.overflow = '';
     }
-
     function updateLightbox() {
       if (currentGallery.length === 0) return;
       lbIndex = (lbIndex + currentGallery.length) % currentGallery.length;
@@ -572,32 +521,25 @@
       const caption = document.getElementById('lightbox-caption');
       const counter = document.getElementById('lightbox-counter');
 
-      // fade transition
       img.style.opacity = '0';
       caption.style.opacity = '0';
 
       const tmp = new Image();
       tmp.onload = () => {
         img.src = tmp.src;
-        img.alt = item.title;
+        img.alt = item.title + ' — Takestwo Studio';
         img.style.opacity = '1';
-        caption.textContent = item.title + ' — ' + item.category;
+        caption.textContent = item.title;
         caption.style.opacity = '1';
       };
-      tmp.onerror = () => {
-        img.src = imgFallback(item.id);
-        img.style.opacity = '1';
-        caption.style.opacity = '1';
-      };
-      tmp.src = imgFull(item.id);
+      tmp.onerror = () => { img.src = item.src; img.style.opacity = '1'; caption.style.opacity = '1'; };
+      tmp.src = item.src;
 
       counter.textContent = String(lbIndex + 1).padStart(2, '0') + ' / ' + String(currentGallery.length).padStart(2, '0');
     }
-
     function nextImage() { lbIndex++; updateLightbox(); }
     function prevImage() { lbIndex--; updateLightbox(); }
 
-    /* ---------- Keyboard controls ---------- */
     document.addEventListener('keydown', (e) => {
       const lb = document.getElementById('lightbox');
       if (!lb.classList.contains('open')) return;
@@ -606,11 +548,8 @@
       if (e.key === 'ArrowLeft') prevImage();
     });
 
-    /* ---------- Swipe support (touch) ---------- */
     let touchStartX = 0;
-    document.getElementById('lightbox').addEventListener('touchstart', (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
+    document.getElementById('lightbox').addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
     document.getElementById('lightbox').addEventListener('touchend', (e) => {
       const dx = e.changedTouches[0].screenX - touchStartX;
       if (Math.abs(dx) > 50) { dx < 0 ? nextImage() : prevImage(); }
@@ -624,7 +563,7 @@
       btn.disabled = true;
       status.textContent = 'Sending...';
       setTimeout(() => {
-        status.textContent = 'Thank you — your message has been received.';
+        status.textContent = 'Thank you — Takestwo Studio will be in touch.';
         e.target.reset();
         btn.disabled = false;
         setTimeout(() => { status.textContent = ''; }, 5000);
@@ -634,7 +573,7 @@
 
     /* ---------- Init ---------- */
     document.addEventListener('DOMContentLoaded', () => {
-      renderGallery('all');
+      renderGallery('overview');
       runReveals(document.getElementById('portfolio-view'));
     });
   </script>
