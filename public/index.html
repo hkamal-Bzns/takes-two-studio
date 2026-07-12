@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ADLER — Fashion & Beauty Photographer</title>
+  <meta name="description" content="ADLER Studio — High-end fashion & beauty photography. Editorial, beauty, glamour and advertising portfolios." />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Playfair Display (serif) + Montserrat (thin sans) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Montserrat:wght@200;300;400;500;600&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['Montserrat', 'Helvetica', 'Arial', 'sans-serif'],
+          },
+          letterSpacing: {
+            ultra: '0.35em',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root { --ease: cubic-bezier(0.22, 1, 0.36, 1); }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    .font-serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* ---------- SPA view routing ---------- */
+    .view {
+      display: none;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+    }
+    .view.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ---------- Masonry via CSS columns ---------- */
+    .masonry {
+      column-count: 1;
+      column-gap: 0;
+    }
+    @media (min-width: 640px)  { .masonry { column-count: 2; } }
+    @media (min-width: 1024px) { .masonry { column-count: 3; } }
+    @media (min-width: 1536px) { .masonry { column-count: 4; } }
+    .masonry-item {
+      break-inside: avoid;
+      -webkit-column-break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    /* ---------- Nav underline ---------- */
+    .nav-link {
+      position: relative;
+      padding-bottom: 4px;
+      cursor: pointer;
+      transition: opacity 0.3s var(--ease);
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 0;
+      height: 1px;
+      background: #000;
+      transition: width 0.4s var(--ease);
+    }
+    .nav-link:hover::after,
+    .nav-link.is-active::after { width: 100%; }
+    .nav-link:hover { opacity: 0.65; }
+
+    /* ---------- Portfolios dropdown (CSS-driven) ---------- */
+    .dropdown-menu {
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px);
+      transition: opacity 0.3s var(--ease), transform 0.3s var(--ease), visibility 0.3s;
+    }
+    .dropdown:hover .dropdown-menu,
+    .dropdown:focus-within .dropdown-menu {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .dropdown-item { transition: color 0.3s var(--ease), padding-left 0.3s var(--ease); }
+    .dropdown-item:hover { color: rgba(0,0,0,0.5); padding-left: 6px; }
+
+    /* ---------- Gallery hover overlay ---------- */
+    .gallery-item .overlay {
+      opacity: 0;
+      transition: opacity 0.5s var(--ease);
+    }
+    .gallery-item:hover .overlay { opacity: 1; }
+    .gallery-item img {
+      transition: transform 1.2s var(--ease), filter 0.6s var(--ease);
+    }
+    .gallery-item:hover img { transform: scale(1.04); filter: brightness(0.7); }
+    .gallery-item .campaign-title {
+      transform: translateY(12px);
+      transition: transform 0.6s var(--ease);
+    }
+    .gallery-item:hover .campaign-title { transform: translateY(0); }
+
+    /* ---------- Lightbox ---------- */
+    .lightbox {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.45s var(--ease);
+    }
+    .lightbox.open { opacity: 1; pointer-events: auto; }
+    .lightbox img.lb-img {
+      transform: scale(0.96);
+      transition: opacity 0.4s var(--ease), transform 0.5s var(--ease);
+    }
+    .lightbox.open img.lb-img { transform: scale(1); }
+    .lb-fade { transition: opacity 0.35s var(--ease); }
+
+    /* ---------- Mobile menu ---------- */
+    .mobile-menu {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.5s var(--ease);
+    }
+    .mobile-menu.open { max-height: 480px; }
+
+    /* ---------- Contact form (bottom-border inputs) ---------- */
+    .field {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(0,0,0,0.2);
+      border-radius: 0;
+      padding: 0.85rem 0;
+      width: 100%;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 300;
+      transition: border-color 0.3s var(--ease);
+    }
+    .field:focus {
+      outline: none;
+      border-bottom-color: #000;
+    }
+    .field::placeholder { color: rgba(0,0,0,0.35); font-weight: 300; }
+
+    /* ---------- Scrollbar ---------- */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #fff; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.35); }
+
+    /* ---------- Initial page fade ---------- */
+    #app { animation: appIn 0.8s var(--ease) both; }
+    @keyframes appIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Lazy fade-up for sections */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
+    .reveal.in { opacity: 1; transform: translateY(0); }
+
+    /* Image loading shimmer */
+    .img-skeleton { background: linear-gradient(90deg, #f2f2f2 25%, #e6e6e6 37%, #f2f2f2 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; }
+    @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  </style>
+</head>
+
+<body class="bg-white text-black min-h-screen flex flex-col antialiased">
+  <div id="app" class="flex-1 flex flex-col">
+
+    <!-- ===================== HEADER ===================== -->
+    <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-black/5">
+      <div class="flex items-center justify-between px-5 md:px-12 py-5">
+        <!-- Logo -->
+        <a href="#" onclick="showView('portfolio-view'); return false;" class="flex items-baseline gap-3 group">
+          <span class="font-serif text-2xl md:text-3xl tracking-wide leading-none">ADLER</span>
+          <span class="hidden sm:inline-block w-px h-4 bg-black/25 self-center"></span>
+          <span class="hidden sm:inline text-[10px] tracking-[0.3em] uppercase text-black/50 font-light">Fashion &amp; Beauty Photographer</span>
+        </a>
+
+        <!-- Desktop nav -->
+        <nav class="hidden md:flex items-center gap-12 text-[11px] tracking-[0.22em] uppercase font-light">
+          <div class="dropdown relative">
+            <button class="nav-link flex items-center gap-1.5" aria-haspopup="true">
+              Portfolios
+              <svg class="w-2.5 h-2.5 opacity-50" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1"/></svg>
+            </button>
+            <div class="dropdown-menu absolute top-full right-0 mt-5 bg-white border border-black/10 py-4 min-w-[200px] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.25)]">
+              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('editorial'); return false;">Editorial</a>
+              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('beauty'); return false;">Beauty</a>
+              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('glamour'); return false;">Glamour</a>
+              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('advertising'); return false;">Advertising</a>
+              <div class="border-t border-black/10 my-2"></div>
+              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer text-black/50" onclick="filterPortfolio('all'); return false;">All Work</a>
+            </div>
+          </div>
+          <a class="nav-link" onclick="showView('about-view'); return false;">About</a>
+          <a class="nav-link" onclick="showView('contact-view'); return false;">Contact</a>
+        </nav>
+
+        <!-- Mobile hamburger -->
+        <button class="md:hidden flex flex-col gap-[5px] p-2" onclick="toggleMobileMenu()" aria-label="Menu">
+          <span class="block w-6 h-px bg-black transition-transform"></span>
+          <span class="block w-6 h-px bg-black transition-opacity"></span>
+          <span class="block w-6 h-px bg-black transition-transform"></span>
+        </button>
+      </div>
+
+      <!-- Mobile menu -->
+      <div id="mobile-menu" class="mobile-menu md:hidden border-t border-black/5 bg-white">
+        <div class="px-5 py-4 flex flex-col text-[12px] tracking-[0.22em] uppercase font-light">
+          <a class="py-3 border-b border-black/5 cursor-pointer" onclick="filterPortfolio('all'); closeMobileMenu();">Portfolios — All</a>
+          <a class="py-3 pl-4 border-b border-black/5 cursor-pointer text-black/60" onclick="filterPortfolio('editorial'); closeMobileMenu();">Editorial</a>
+          <a class="py-3 pl-4 border-b border-black/5 cursor-pointer text-black/60" onclick="filterPortfolio('beauty'); closeMobileMenu();">Beauty</a>
+          <a class="py-3 pl-4 border-b border-black/5 cursor-pointer text-black/60" onclick="filterPortfolio('glamour'); closeMobileMenu();">Glamour</a>
+          <a class="py-3 pl-4 border-b border-black/5 cursor-pointer text-black/60" onclick="filterPortfolio('advertising'); closeMobileMenu();">Advertising</a>
+          <a class="py-3 border-b border-black/5 cursor-pointer" onclick="showView('about-view'); closeMobileMenu();">About</a>
+          <a class="py-3 cursor-pointer" onclick="showView('contact-view'); closeMobileMenu();">Contact</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===================== MAIN ===================== -->
+    <main class="flex-1">
+
+      <!-- ========== VIEW A: PORTFOLIO ========== -->
+      <section id="portfolio-view" class="view active">
+        <!-- Portfolio intro -->
+        <div class="px-5 md:px-12 pt-14 md:pt-20 pb-8 md:pb-10 max-w-screen-2xl">
+          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div>
+              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-4">Selected Works · 2019—2024</p>
+              <h1 class="font-serif text-4xl md:text-6xl leading-[1.05]">A study in <em class="text-black/70">light</em>,<br/>form &amp; stillness.</h1>
+            </div>
+            <div class="flex items-center gap-5 text-[10px] tracking-[0.3em] uppercase text-black/40">
+              <span id="filter-label">All Portfolios</span>
+              <span class="w-8 h-px bg-black/20"></span>
+              <span id="filter-count">15</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Masonry grid -->
+        <div id="masonry-grid" class="masonry w-full"></div>
+      </section>
+
+      <!-- ========== VIEW B: ABOUT ========== -->
+      <section id="about-view" class="view">
+        <div class="px-5 md:px-12 py-16 md:py-24 max-w-screen-xl mx-auto w-full">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-start">
+            <!-- Left: image -->
+            <div class="reveal">
+              <div class="overflow-hidden">
+                <img
+                  src="https://images.unsplash.com/photo-1487412720507-e7ab37603c6a?auto=format&fit=crop&w=900&q=80"
+                  alt="Portrait of the photographer"
+                  onerror="this.onerror=null;this.src='https://picsum.photos/seed/adlerportrait/900/1100';"
+                  class="w-full object-cover aspect-[4/5]" />
+              </div>
+              <p class="mt-5 text-[10px] tracking-[0.3em] uppercase text-black/40">New York · Paris · Milan</p>
+            </div>
+
+            <!-- Right: content -->
+            <div class="reveal" style="transition-delay:0.15s;">
+              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">The Artist</p>
+              <h2 class="font-serif text-4xl md:text-5xl leading-[1.1] mb-8">About the Artist</h2>
+              <div class="space-y-6 text-[15px] leading-[1.9] text-black/75 font-light max-w-md">
+                <p>For over a decade, Adler has defined a signature aesthetic — clean, luminous, and unapologetically modern. Her work moves between the intimacy of a beauty close-up and the grand choreography of an editorial story, always guided by a singular devotion to the human face.</p>
+                <p>Shooting between studios in New York and Paris, she has crafted visual languages for the houses that shape how the world sees beauty — translating mood into image, and image into desire.</p>
+              </div>
+
+              <!-- Clients -->
+              <div class="mt-12">
+                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">Selected Clients</p>
+                <ul class="grid grid-cols-2 gap-y-3 gap-x-8 font-serif text-lg italic text-black/85">
+                  <li>Vogue</li>
+                  <li>Harper's Bazaar</li>
+                  <li>Chanel</li>
+                  <li>Dior</li>
+                  <li>Canon</li>
+                  <li>Numéro</li>
+                  <li>Saint Laurent</li>
+                  <li>Elle</li>
+                </ul>
+              </div>
+
+              <!-- Recognition -->
+              <div class="mt-12 pt-8 border-t border-black/10">
+                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">Recognition</p>
+                <div class="space-y-3 text-[13px] font-light text-black/70">
+                  <div class="flex justify-between border-b border-black/5 pb-3"><span>Hasselblad Masters — Fashion</span><span class="text-black/40">2023</span></div>
+                  <div class="flex justify-between border-b border-black/5 pb-3"><span>One Show — Gold Pencil</span><span class="text-black/40">2022</span></div>
+                  <div class="flex justify-between border-b border-black/5 pb-3"><span>Communication Arts Annual</span><span class="text-black/40">2021</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== VIEW C: CONTACT ========== -->
+      <section id="contact-view" class="view">
+        <div class="px-5 md:px-6 py-20 md:py-28 max-w-xl mx-auto w-full">
+          <div class="text-center mb-14 reveal">
+            <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-5">Get in Touch</p>
+            <h2 class="font-serif text-4xl md:text-5xl leading-tight">Let's create<br/><em>something timeless.</em></h2>
+          </div>
+
+          <!-- Contact details -->
+          <div class="space-y-8 mb-16 reveal" style="transition-delay:0.1s;">
+            <div class="text-center">
+              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Studio</p>
+              <a href="mailto:studio@adlerphotography.com" class="text-lg md:text-xl font-light hover:opacity-60 transition-opacity">studio@adlerphotography.com</a>
+            </div>
+            <div class="grid grid-cols-2 gap-8 text-center">
+              <div>
+                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">New York</p>
+                <p class="text-sm font-light text-black/70">+1 212 555 0184</p>
+              </div>
+              <div>
+                <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Paris</p>
+                <p class="text-sm font-light text-black/70">+33 1 55 02 0184</p>
+              </div>
+            </div>
+            <div class="text-center pt-2">
+              <p class="text-[10px] tracking-[0.3em] uppercase text-black/40 mb-2">Representation</p>
+              <p class="text-sm font-light text-black/70">Art Department — <span class="italic">J. Mercer</span></p>
+              <a href="mailto:bookings@artdept.com" class="text-sm font-light text-black/70 hover:opacity-60 transition-opacity">bookings@artdept.com</a>
+            </div>
+          </div>
+
+          <!-- Form -->
+          <form id="contact-form" class="space-y-9 reveal" style="transition-delay:0.2s;" onsubmit="return submitForm(event);">
+            <div>
+              <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="name">Name</label>
+              <input id="name" name="name" type="text" class="field" placeholder="Your full name" required />
+            </div>
+            <div>
+              <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="email">Email</label>
+              <input id="email" name="email" type="email" class="field" placeholder="you@studio.com" required />
+            </div>
+            <div>
+              <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="subject">Subject</label>
+              <input id="subject" name="subject" type="text" class="field" placeholder="Editorial / Campaign / Other" required />
+            </div>
+            <div>
+              <label class="block text-[10px] tracking-[0.3em] uppercase text-black/40 mb-1" for="message">Message</label>
+              <textarea id="message" name="message" rows="4" class="field resize-none" placeholder="Tell us about your project..." required></textarea>
+            </div>
+            <div class="pt-2">
+              <button type="submit" class="group inline-flex items-center gap-4 text-[11px] tracking-[0.3em] uppercase font-light pb-2 border-b border-black hover:gap-6 transition-all">
+                Send Message
+                <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" stroke-width="1"/></svg>
+              </button>
+            </div>
+            <p id="form-status" class="text-[11px] tracking-[0.2em] uppercase text-black/50 h-4"></p>
+          </form>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ===================== FOOTER (sticky bottom) ===================== -->
+    <footer class="mt-auto bg-black text-white">
+      <div class="px-5 md:px-12 py-14">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8 max-w-screen-2xl">
+          <div>
+            <h3 class="font-serif text-2xl mb-3">ADLER</h3>
+            <p class="text-[11px] tracking-[0.25em] uppercase text-white/50 font-light">Fashion &amp; Beauty Photographer</p>
+          </div>
+          <div>
+            <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-4">Navigate</p>
+            <ul class="space-y-2 text-sm font-light">
+              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="showView('portfolio-view'); return false;">Portfolios</a></li>
+              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="showView('about-view'); return false;">About</a></li>
+              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="showView('contact-view'); return false;">Contact</a></li>
+            </ul>
+          </div>
+          <div>
+            <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-4">Connect</p>
+            <ul class="space-y-2 text-sm font-light">
+              <li><a href="#" class="hover:text-white/60 transition-colors">Instagram</a></li>
+              <li><a href="#" class="hover:text-white/60 transition-colors">Behance</a></li>
+              <li><a href="#" class="hover:text-white/60 transition-colors">LinkedIn</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="mt-12 pt-6 border-t border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-[10px] tracking-[0.25em] uppercase text-white/40 font-light">
+          <span>© 2024 Adler Studio. All Rights Reserved.</span>
+          <span>New York · Paris · Milan</span>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ===================== LIGHTBOX ===================== -->
+  <div id="lightbox" class="lightbox fixed inset-0 z-50 bg-black/95 flex items-center justify-center" onclick="if(event.target===this)closeLightbox()">
+    <button onclick="closeLightbox()" aria-label="Close" class="absolute top-5 right-5 md:top-8 md:right-10 text-white/80 hover:text-white text-4xl md:text-5xl font-light leading-none transition-colors">×</button>
+
+    <button onclick="prevImage()" aria-label="Previous" class="absolute left-3 md:left-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl md:text-6xl font-light leading-none transition-colors px-2">‹</button>
+
+    <figure class="flex flex-col items-center max-w-[90vw] max-h-[90vh]">
+      <img id="lightbox-img" class="lb-img max-h-[82vh] max-w-[88vw] object-contain" src="" alt="" />
+      <figcaption id="lightbox-caption" class="lb-fade mt-5 text-white/70 text-[10px] tracking-[0.3em] uppercase text-center"></figcaption>
+    </figure>
+
+    <button onclick="nextImage()" aria-label="Next" class="absolute right-3 md:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl md:text-6xl font-light leading-none transition-colors px-2">›</button>
+
+    <div id="lightbox-counter" class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/40 text-[10px] tracking-[0.3em] uppercase"></div>
+  </div>
+
+  <!-- ===================== SCRIPT ===================== -->
+  <script>
+    /* ---------- Gallery data ---------- */
+    const galleryData = [
+      { id: '1492684223066-81342ee5ff30', category: 'editorial',   title: 'Vogue Italia',          aspect: '3 / 4' },
+      { id: '1509631179647-0177331693ae', category: 'beauty',      title: 'Chanel Beauty',         aspect: '4 / 5' },
+      { id: '1485231183945-fffde7cc051e', category: 'glamour',     title: "Harper's Bazaar",        aspect: '3 / 4' },
+      { id: '1524504388940-b1c1722653e1', category: 'editorial',   title: 'Dior SS24',             aspect: '4 / 3' },
+      { id: '1502323777036-f29e3972d82f', category: 'glamour',     title: 'Elle Magazine',         aspect: '4 / 5' },
+      { id: '1496440737103-cd596325d314', category: 'glamour',     title: 'Saint Laurent',         aspect: '3 / 4' },
+      { id: '1539109136881-3be0616acf4b', category: 'advertising', title: 'Bvlgari Campaign',       aspect: '4 / 3' },
+      { id: '1488161628813-04466f872be2', category: 'editorial',   title: 'Numéro',                aspect: '3 / 4' },
+      { id: '1485875437342-9b39470b3d95', category: 'advertising', title: 'Louis Vuitton',         aspect: '4 / 5' },
+      { id: '1492288991661-058aa541ff43', category: 'glamour',     title: 'Marie Claire',          aspect: '3 / 4' },
+      { id: '1469334031218-e382a71b716b', category: 'advertising', title: 'Prada Campaign',        aspect: '4 / 3' },
+      { id: '1531123897727-8f129e1688ce', category: 'editorial',   title: 'W Magazine',            aspect: '4 / 5' },
+      { id: '1515886657613-9f3515b0c78f', category: 'beauty',      title: 'Tom Ford Beauty',       aspect: '3 / 4' },
+      { id: '1567401893414-76b7b1e5a7a5', category: 'beauty',      title: 'NARS Cosmetics',        aspect: '4 / 5' },
+      { id: '1542596594-649edbc13630', category: 'beauty',        title: 'M·A·C Studio',          aspect: '3 / 4' },
+    ];
+
+    const imgThumb = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=900&q=80`;
+    const imgFull  = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1600&q=85`;
+    const imgFallback = (id) => `https://picsum.photos/seed/adler${id}/900/1100`;
+
+    let currentGallery = [];   // currently rendered (visible) items
+    let currentFilter  = 'all';
+    let lbIndex = 0;
+
+    /* ---------- Render masonry ---------- */
+    function renderGallery(filter = 'all') {
+      const grid = document.getElementById('masonry-grid');
+      grid.innerHTML = '';
+      currentGallery = [];
+
+      const items = filter === 'all'
+        ? galleryData
+        : galleryData.filter(g => g.category === filter);
+
+      items.forEach((item, i) => {
+        const thumb = imgThumb(item.id);
+        const figure = document.createElement('figure');
+        figure.className = 'gallery-item masonry-item relative overflow-hidden cursor-pointer bg-neutral-100';
+        figure.style.aspectRatio = item.aspect;
+
+        figure.innerHTML = `
+          <img src="${thumb}"
+               alt="${item.title}"
+               loading="lazy"
+               onerror="this.onerror=null;this.src='${imgFallback(item.id)}';"
+               class="w-full h-full object-cover block" />
+          <div class="overlay absolute inset-0 bg-black/60 flex items-center justify-center">
+            <span class="campaign-title text-white text-[11px] tracking-[0.35em] uppercase font-light text-center px-4">
+              ${item.title}
+            </span>
+          </div>
+        `;
+
+        figure.addEventListener('click', () => openLightbox(i));
+        grid.appendChild(figure);
+        currentGallery.push(item);
+      });
+
+      // Update header counters
+      const label = document.getElementById('filter-label');
+      const count = document.getElementById('filter-count');
+      if (label) label.textContent = filter === 'all' ? 'All Portfolios' : (filter.charAt(0).toUpperCase() + filter.slice(1));
+      if (count) count.textContent = currentGallery.length;
+    }
+
+    /* ---------- Portfolio filter ---------- */
+    function filterPortfolio(category) {
+      currentFilter = category;
+      renderGallery(category);
+      showView('portfolio-view');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /* ---------- SPA routing ---------- */
+    function showView(viewId) {
+      const views = document.querySelectorAll('.view');
+      views.forEach(v => v.classList.remove('active'));
+
+      const target = document.getElementById(viewId);
+      if (!target) return;
+
+      // small delay so the fade-out/fade-in feels intentional
+      requestAnimationFrame(() => {
+        target.classList.add('active');
+        runReveals(target);
+        window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+      });
+
+      // sync nav active states
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('is-active'));
+      if (viewId === 'portfolio-view') {
+        const links = document.querySelectorAll('.nav-link');
+        if (links[0]) links[0].classList.add('is-active');
+      }
+      closeMobileMenu();
+    }
+
+    /* ---------- Reveal-on-scroll for sections ---------- */
+    function runReveals(scope = document) {
+      const els = scope.querySelectorAll('.reveal');
+      els.forEach(el => {
+        el.classList.remove('in');
+        requestAnimationFrame(() => {
+          setTimeout(() => el.classList.add('in'), 50);
+        });
+      });
+    }
+
+    /* ---------- Mobile menu ---------- */
+    function toggleMobileMenu() {
+      document.getElementById('mobile-menu').classList.toggle('open');
+    }
+    function closeMobileMenu() {
+      document.getElementById('mobile-menu').classList.remove('open');
+    }
+
+    /* ---------- Lightbox ---------- */
+    function openLightbox(index) {
+      lbIndex = index;
+      const lb = document.getElementById('lightbox');
+      lb.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      updateLightbox();
+    }
+
+    function closeLightbox() {
+      const lb = document.getElementById('lightbox');
+      lb.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    function updateLightbox() {
+      if (currentGallery.length === 0) return;
+      lbIndex = (lbIndex + currentGallery.length) % currentGallery.length;
+      const item = currentGallery[lbIndex];
+      const img = document.getElementById('lightbox-img');
+      const caption = document.getElementById('lightbox-caption');
+      const counter = document.getElementById('lightbox-counter');
+
+      // fade transition
+      img.style.opacity = '0';
+      caption.style.opacity = '0';
+
+      const tmp = new Image();
+      tmp.onload = () => {
+        img.src = tmp.src;
+        img.alt = item.title;
+        img.style.opacity = '1';
+        caption.textContent = item.title + ' — ' + item.category;
+        caption.style.opacity = '1';
+      };
+      tmp.onerror = () => {
+        img.src = imgFallback(item.id);
+        img.style.opacity = '1';
+        caption.style.opacity = '1';
+      };
+      tmp.src = imgFull(item.id);
+
+      counter.textContent = String(lbIndex + 1).padStart(2, '0') + ' / ' + String(currentGallery.length).padStart(2, '0');
+    }
+
+    function nextImage() { lbIndex++; updateLightbox(); }
+    function prevImage() { lbIndex--; updateLightbox(); }
+
+    /* ---------- Keyboard controls ---------- */
+    document.addEventListener('keydown', (e) => {
+      const lb = document.getElementById('lightbox');
+      if (!lb.classList.contains('open')) return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowRight') nextImage();
+      if (e.key === 'ArrowLeft') prevImage();
+    });
+
+    /* ---------- Swipe support (touch) ---------- */
+    let touchStartX = 0;
+    document.getElementById('lightbox').addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+    document.getElementById('lightbox').addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].screenX - touchStartX;
+      if (Math.abs(dx) > 50) { dx < 0 ? nextImage() : prevImage(); }
+    }, { passive: true });
+
+    /* ---------- Contact form ---------- */
+    function submitForm(e) {
+      e.preventDefault();
+      const status = document.getElementById('form-status');
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      status.textContent = 'Sending...';
+      setTimeout(() => {
+        status.textContent = 'Thank you — your message has been received.';
+        e.target.reset();
+        btn.disabled = false;
+        setTimeout(() => { status.textContent = ''; }, 5000);
+      }, 900);
+      return false;
+    }
+
+    /* ---------- Init ---------- */
+    document.addEventListener('DOMContentLoaded', () => {
+      renderGallery('all');
+      runReveals(document.getElementById('portfolio-view'));
+    });
+  </script>
+</body>
+</html>
