@@ -32,3 +32,32 @@ Stage Summary:
 - Real assets: public/brand/{logo,about}.webp, public/shoots/ad1-7.webp + fb1-7.jpg.
 - Note: F&B images were 403 on the live site's -scaled variants; used the WordPress-sized (-1536xNNN / direct) URLs which downloaded as JPEG.
 - Note: No real client list or social links found on the source site; used a Capabilities list instead of clients, and email+locations instead of socials in the footer.
+
+---
+Task ID: 3
+Agent: main
+Task: Dark mode re-skin, "Takes Two Studio" name beside logo, clickable projects (→ project detail with full image set), and a backend admin panel to add projects/images/campaigns + view contact inquiries.
+
+Work Log:
+- DB: added Project, ProjectImage, Inquiry models to prisma/schema.prisma; ran db:push. Wrote scripts/seed.ts to seed the 14 existing studio images as 14 projects (7 advertising + 7 food-beverage), each with 1 image. Ran seed successfully.
+- Backend API (Next.js route handlers):
+  - GET/POST /api/projects (public list by category; admin create)
+  - GET/PATCH/DELETE /api/projects/[id] (public single; admin update/delete)
+  - POST /api/projects/[id]/images + DELETE /api/projects/[id]/images/[imageId] (admin image add/remove)
+  - POST /api/inquiries (public, from contact form) + GET /api/inquiries (admin list)
+  - PATCH/DELETE /api/inquiries/[id] (admin status/delete)
+  - POST /api/upload (admin multipart file → /public/uploads)
+  - GET /api/auth/login (session check) + POST /api/auth/login (password→cookie) + POST /api/auth/logout
+  - Auth via shared src/lib/auth.ts (ADMIN_TOKEN cookie + Bearer). Simple, no external auth dep.
+- Admin panel at /admin (src/app/admin/page.tsx, client component): login screen → dashboard with Projects + Inquiries tabs. Projects: grid of cards (thumbnail/title/category/img-count/published), New Project button, editor with title/category/order/description/published/cover-image-upload + gallery-image-upload (multi) and per-image delete. Inquiries: inbox with status badges, mark-read/archive/delete. Dark UI matching the site. Fixed react-hooks/set-state-in-effect lint by using refreshRef pattern.
+- Public SPA (public/index.html) full rewrite: DARK theme (bg #0a0a0a, white text, dark lightbox); "Takes Two Studio" serif name beside inverted logo in header + footer; nav Portfolios dropdown (Overview/Advertising/Food & Beverage) + About + Contact; masonry now renders PROJECT COVERS from /api/projects (API-driven, no longer hardcoded); clicking a cover opens a new #project-view with the project's full image set + back button; lightbox works within project view; contact form POSTs to /api/inquiries (real backend); skeletons during load; footer has discreet Admin link.
+- Fixed auth route 404: originally had a single /api/auth/route.ts trying to handle /login and /logout via URL inspection — Next.js needs separate route files. Restructured into /api/auth/login/route.ts (GET=me, POST=login) and /api/auth/logout/route.ts (POST). Updated admin page API paths accordingly.
+- Verification (Agent Browser + VLM): dark theme confirmed; "Takes Two Studio" beside logo confirmed; 14 projects load from API; filters (advertising=7/8, food-beverage=7, overview=14); project click → detail view with title/category/count + back button works; lightbox in project view works (open/nav/close); admin login (pw: takes-two-admin-2024) → dashboard with 14 projects + New Project; created a test project end-to-end (POST 201, appeared on public site); contact form submission → "Thank you" + inquiry appeared in admin inbox (GET /api/inquiries). Cleaned up test data. Mobile: 1 column, name visible. Lint clean. No runtime errors.
+
+Stage Summary:
+- Dark-mode editorial SPA now fully API-driven (projects from DB, inquiries to DB).
+- Admin panel at /admin (password: takes-two-admin-2024) — full project CRUD + image upload + inquiry inbox.
+- Real backend: Prisma (Project/ProjectImage/Inquiry) + Next.js route handlers + cookie auth + file uploads to /public/uploads.
+- Clickable projects open a detail view with the full image set (the rest of the project's images).
+- Name "Takes Two Studio" shown beside the logo in header and footer.
+- All four user requests delivered and browser-verified.

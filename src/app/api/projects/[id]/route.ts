@@ -1,0 +1,37 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { checkAdmin } from "@/lib/auth";
+
+/**
+ * GET /api/projects/[id]            — public, single project + images
+ * PATCH /api/projects/[id]          — admin, update project fields
+ * DELETE /api/projects/[id]         — admin, delete project (cascades images)
+ */
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const project = await db.project.findUnique({
+    where: { id },
+    include: { images: { orderBy: { order: "asc" } } },
+  });
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ project });
+}
+
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  if (!checkAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await ctx.params;
+  const body = await req.json();
+  const data: Record<string, unknown> = {};
+  for (const k of ["title", "category", "coverImage", "description", "order", "published"]) {
+    if (k in body) data[k] = body[k];
+  }
+  const project = await db.project.update({ where: { id }, data });
+  return NextResponse.json({ project });
+}
+
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  if (!checkAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await ctx.params;
+  await db.project.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}
