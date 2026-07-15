@@ -107,6 +107,8 @@
       padding: 1rem 1.25rem;
       pointer-events: none; /* let clicks pass to content except on the bar itself */
     }
+    /* When mobile menu is open, the header captures all clicks (prevents pass-through to hero/gallery) */
+    .floating-header.menu-open { pointer-events: auto; }
     .floating-header.scrolled { padding-top: 0.65rem; padding-bottom: 0.65rem; }
     .floating-bar {
       pointer-events: auto;
@@ -266,9 +268,10 @@
       </div>
 
       <!-- Mobile menu (floating dropdown below the bar — dark grey to match the bar) -->
-      <div id="mobile-menu" class="mobile-menu md:hidden" style="max-width:1280px; margin:0 auto;">
-        <div class="mt-2 rounded-2xl border overflow-hidden" style="background: var(--bar-bg-scrolled); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-color: var(--bar-border);">
-          <div id="mobile-nav" class="px-6 py-4 flex flex-col text-[12px] tracking-[0.22em] uppercase font-light items-end text-right" style="color:#fff;"></div>
+      <div id="mobile-menu" class="mobile-menu md:hidden" style="max-width:1280px; margin:0 auto; position:relative; z-index:60;">
+        <div id="mobile-menu-backdrop" onclick="closeMobileMenu()" style="position:fixed; top:0; left:0; right:0; bottom:0; z-index:59; background:rgba(0,0,0,0.3);"></div>
+        <div class="mt-2 rounded-2xl border overflow-hidden" style="background: var(--bar-bg-scrolled); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-color: var(--bar-border); position:relative; z-index:61;">
+          <div id="mobile-nav" class="px-6 py-4 flex flex-col text-[12px] tracking-[0.22em] uppercase font-light items-end text-right" style="color:#fff; position:relative; z-index:62;"></div>
         </div>
       </div>
     </header>
@@ -617,8 +620,10 @@
         if (mobile) {
           const a = document.createElement('a');
           a.className = 'py-3 border-b border-white/5 cursor-pointer';
+          a.style.position = 'relative';
+          a.style.zIndex = '63';
           a.textContent = s.label;
-          a.onclick = (e) => { e.preventDefault(); navAction(s.key)(); closeMobileMenu(); };
+          a.onclick = (e) => { e.preventDefault(); e.stopPropagation(); navAction(s.key)(); closeMobileMenu(); };
           mobile.appendChild(a);
         }
         // Footer
@@ -944,8 +949,18 @@
       });
     }
 
-    function toggleMobileMenu(){ document.getElementById('mobile-menu').classList.toggle('open'); }
-    function closeMobileMenu(){ document.getElementById('mobile-menu').classList.remove('open'); }
+    function toggleMobileMenu(){
+      const menu = document.getElementById('mobile-menu');
+      const header = document.getElementById('floating-header');
+      menu.classList.toggle('open');
+      if (header) header.classList.toggle('menu-open', menu.classList.contains('open'));
+    }
+    function closeMobileMenu(){
+      const menu = document.getElementById('mobile-menu');
+      const header = document.getElementById('floating-header');
+      menu.classList.remove('open');
+      if (header) header.classList.remove('menu-open');
+    }
 
     /* ---------- Lightbox ---------- */
     /* Open the lightbox from the masonry grid (cycling through the currently visible covers) */
