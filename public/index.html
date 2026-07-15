@@ -1,6 +1,15 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" data-theme="dark">
 <head>
+  <script>
+    // Apply theme ASAP to avoid flash (reads localStorage, falls back to dark)
+    (function(){
+      try {
+        var t = localStorage.getItem('tts-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch(e) { document.documentElement.setAttribute('data-theme','dark'); }
+    })();
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Takes Two Studio — Advertising &amp; Food &amp; Beverage Photography</title>
@@ -22,29 +31,140 @@
 
   <style>
     :root { --ease: cubic-bezier(0.22, 1, 0.36, 1); }
+
+    /* ---------- Theme tokens (driven by data-theme on <html>) ---------- */
+    html[data-theme="dark"] {
+      --bg: #0a0a0a;
+      --bg-rgb: 10, 10, 10;
+      --text: #ffffff;
+      --text-soft: rgba(255,255,255,0.78);
+      --text-faint: rgba(255,255,255,0.5);
+      --border: rgba(255,255,255,0.12);
+      --border-soft: rgba(255,255,255,0.06);
+      --line: rgba(255,255,255,0.22);
+      --card: #181818;
+      --field-border: rgba(255,255,255,0.2);
+      --field-ph: rgba(255,255,255,0.3);
+      --overlay: rgba(0,0,0,0.6);
+      --shadow: rgba(0,0,0,0.8);
+      --bar-bg: rgba(20, 20, 22, 0.82);   /* dark grey translucent floating bar */
+      --bar-bg-scrolled: rgba(20, 20, 22, 0.92);
+      --bar-border: rgba(255,255,255,0.1);
+      --invert: 0;
+    }
+    html[data-theme="light"] {
+      --bg: #ffffff;
+      --bg-rgb: 255, 255, 255;
+      --text: #0a0a0a;
+      --text-soft: rgba(0,0,0,0.82);
+      --text-faint: rgba(0,0,0,0.55);
+      --border: rgba(0,0,0,0.14);
+      --border-soft: rgba(0,0,0,0.07);
+      --line: rgba(0,0,0,0.25);
+      --card: #f4f4f4;
+      --field-border: rgba(0,0,0,0.25);
+      --field-ph: rgba(0,0,0,0.4);
+      --overlay: rgba(255,255,255,0.6);
+      --shadow: rgba(0,0,0,0.25);
+      --bar-bg: rgba(35, 35, 38, 0.82);   /* dark grey translucent floating bar — same in both modes */
+      --bar-bg-scrolled: rgba(35, 35, 38, 0.94);
+      --bar-border: rgba(255,255,255,0.12);
+      --invert: 0;
+    }
+
     html { scroll-behavior: smooth; }
     body {
       font-family: 'Montserrat', sans-serif; font-weight: 300;
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+      background: var(--bg); color: var(--text);
+      transition: background 0.4s var(--ease), color 0.4s var(--ease);
     }
     .font-serif { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* theme-aware utility helpers (used in lieu of hardcoded colors) */
+    .t-bg { background-color: var(--bg); }
+    .t-bg-card { background-color: var(--card); }
+    .t-bg-trans { background-color: rgba(var(--bg-rgb), 0.85); }
+    .t-text { color: var(--text); }
+    .t-text-soft { color: var(--text-soft); }
+    .t-text-faint { color: var(--text-faint); }
+    .t-border { border-color: var(--border); }
+    .t-border-soft { border-color: var(--border-soft); }
+    .t-line { background-color: var(--line); }
+    .logo-themed { filter: invert(var(--invert)); }
+    /* Light mode: keep the logo's original colors (yellow T + black frame + gray text) — no filter */
+    html[data-theme="light"] .logo-themed { filter: none; }
 
     /* ---------- SPA views ---------- */
     .view { display:none; opacity:0; transform:translateY(8px); transition:opacity .6s var(--ease), transform .6s var(--ease); }
     .view.active { display:block; opacity:1; transform:translateY(0); }
 
-    /* ---------- Masonry ---------- */
-    .masonry { column-count:1; column-gap:0; }
-    @media (min-width:640px){ .masonry{ column-count:2; } }
-    @media (min-width:1024px){ .masonry{ column-count:3; } }
-    @media (min-width:1536px){ .masonry{ column-count:4; } }
-    .masonry-item { break-inside:avoid; -webkit-column-break-inside:avoid; page-break-inside:avoid; }
+    /* ---------- Floating nav ---------- */
+    .floating-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 50;
+      padding: 1rem 1.25rem;
+      pointer-events: none; /* let clicks pass to content except on the bar itself */
+    }
+    .floating-header.scrolled { padding-top: 0.65rem; padding-bottom: 0.65rem; }
+    .floating-bar {
+      pointer-events: auto;
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.6rem 1.25rem;
+      border-radius: 9999px;
+      background: var(--bar-bg);
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      border: 1px solid var(--bar-border);
+      box-shadow: 0 8px 30px -10px rgba(0,0,0,0.4);
+      transition: padding 0.4s var(--ease), background 0.4s var(--ease), box-shadow 0.4s var(--ease);
+      color: #fff; /* nav bar is always dark-grey, so text is always white */
+    }
+    .floating-header.scrolled .floating-bar {
+      background: var(--bar-bg-scrolled);
+      box-shadow: 0 12px 44px -10px rgba(0,0,0,0.5);
+    }
+    /* nav links + hamburger + theme toggle are always white (on the dark bar) */
+    .floating-bar .nav-link { color: #fff; opacity: 0.78; background: transparent; }
+    .floating-bar .nav-link:hover { opacity: 1; }
+    .floating-bar .nav-link.is-active { opacity: 1; }
+    .floating-bar .nav-link::after { background: #fff; } /* underline only */
+    .floating-bar button[aria-label="Menu"] span { background: #fff !important; }
+    .floating-bar button[aria-label="Toggle theme"] { color: #fff; }
+    .floating-bar .logo-themed { filter: none !important; } /* logo keeps original colors on the dark bar */
+    .floating-bar .nav-section { flex: 1; display: flex; justify-content: center; }
+    @media (max-width: 767px) {
+      .floating-bar .nav-section { display: none; }
+    }
 
-    /* ---------- Nav ---------- */
-    .nav-link { position:relative; padding-bottom:4px; cursor:pointer; transition:opacity .3s var(--ease); }
-    .nav-link::after { content:''; position:absolute; left:0; bottom:0; width:0; height:1px; background:#fff; transition:width .4s var(--ease); }
+    /* ---------- Masonry ---------- */
+    /* ---------- Uniform grid (landscape rectangles, 3 cols, ZERO gap — edge-to-edge) ---------- */
+    .masonry {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    @media (min-width:640px){ .masonry{ grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width:1024px){ .masonry{ grid-template-columns: repeat(3, 1fr); } }
+    .masonry-item { break-inside:unset; -webkit-column-break-inside:unset; page-break-inside:unset; }
+    /* force uniform landscape aspect ratio on every gallery image box */
+    .masonry-item.gallery-item { aspect-ratio: 4 / 3; }
+    .masonry-item.gallery-item img { width:100%; height:100%; object-fit:cover; }
+
+    /* ---------- Nav (Lindsay Adler style: centered, spaced, active underline) ---------- */
+    .nav-link { position:relative; padding-bottom:6px; cursor:pointer; transition:opacity .3s var(--ease); white-space:nowrap; }
+    .nav-link::after { content:''; position:absolute; left:50%; bottom:0; width:0; height:1px; background:var(--text); transform:translateX(-50%); transition:width .4s var(--ease); }
     .nav-link:hover::after, .nav-link.is-active::after { width:100%; }
-    .nav-link:hover { opacity:.65; }
+    .nav-link:hover { opacity:.55; }
+    .nav-link.is-active { opacity:1; }
+    /* optical nudge: nav text sits slightly lower so it reads balanced against the taller logo */
+    #desktop-nav { transform: translateY(3px); }
 
     .dropdown-menu { opacity:0; visibility:hidden; transform:translateY(10px); transition:opacity .3s var(--ease), transform .3s var(--ease), visibility .3s; }
     .dropdown:hover .dropdown-menu, .dropdown:focus-within .dropdown-menu { opacity:1; visibility:visible; transform:translateY(0); }
@@ -59,6 +179,30 @@
     .gallery-item .campaign-title { transform:translateY(12px); transition:transform .6s var(--ease); }
     .gallery-item:hover .campaign-title { transform:translateY(0); }
 
+    /* ---------- Hero Slideshow (video-like, no zoom) ---------- */
+    .hero-slideshow { position:relative; width:100%; height:100vh; min-height:560px; overflow:hidden; background:#0a0a0a; }
+    .hero-slide { position:absolute; inset:0; opacity:0; transition:opacity 1.8s var(--ease); pointer-events:none; overflow:hidden; }
+    .hero-slide.active { opacity:1; pointer-events:auto; cursor:pointer; }
+    .hero-slide img { width:108%; height:100%; object-fit:cover; max-width:none; transform:translateX(-2%); image-rendering:auto; -webkit-font-smoothing:antialiased; backface-visibility:hidden; }
+    /* gentle horizontal drift alternating direction, gives a continuous video-like pan */
+    .hero-slide.active img { animation: panDrift 6s linear forwards; }
+    .hero-slide.active:nth-child(odd) img { animation-name: panDriftL; }
+    @keyframes panDrift { from { transform:translateX(-4%); } to { transform:translateX(-2%); } }
+    @keyframes panDriftL { from { transform:translateX(-2%); } to { transform:translateX(0%); } }
+    .hero-overlay { position:absolute; inset:0; background:linear-gradient(180deg, rgba(10,10,10,0.3) 0%, rgba(10,10,10,0) 30%, rgba(10,10,10,0) 55%, rgba(10,10,10,0.75) 100%); pointer-events:none; z-index:2; }
+    .hero-content { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 1.5rem; pointer-events:none; z-index:3; }
+    .hero-title { animation: heroIn 1.2s var(--ease) both; }
+    .hero-tag { animation: heroIn 1.2s var(--ease) 0.2s both; }
+    @keyframes heroIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+    .hero-dots { position:absolute; bottom:2.8rem; left:50%; transform:translateX(-50%); display:flex; gap:0.5rem; z-index:5; padding:0.6rem 0.9rem; background:rgba(0,0,0,0.25); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+    .hero-dot { width:26px; height:3px; background:rgba(255,255,255,0.45); transition:background .4s var(--ease); cursor:pointer; }
+    .hero-dot.active { background:#fff; }
+    .hero-scroll { position:absolute; bottom:1.2rem; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:0.4rem; animation: scrollBounce 2.4s var(--ease) infinite; z-index:5; }
+    @keyframes scrollBounce { 0%,100% { transform:translateX(-50%) translateY(0); } 50% { transform:translateX(-50%) translateY(6px); } }
+    .hero-progress { position:absolute; bottom:0; left:0; height:2px; background:rgba(255,255,255,0.9); width:0; z-index:6; }
+    .hero-progress.run { animation: progress 5s linear forwards; }
+    @keyframes progress { from { width:0; } to { width:100%; } }
+
     /* ---------- Lightbox ---------- */
     .lightbox { opacity:0; pointer-events:none; transition:opacity .45s var(--ease); }
     .lightbox.open { opacity:1; pointer-events:auto; }
@@ -70,15 +214,15 @@
     .mobile-menu { max-height:0; overflow:hidden; transition:max-height .5s var(--ease); }
     .mobile-menu.open { max-height:520px; }
 
-    /* ---------- Contact form (bottom-border) ---------- */
-    .field { background:transparent; border:none; border-bottom:1px solid rgba(255,255,255,0.2); border-radius:0; padding:0.85rem 0; width:100%; font-family:'Montserrat',sans-serif; font-weight:300; color:#fff; transition:border-color .3s var(--ease); }
-    .field:focus { outline:none; border-bottom-color:#fff; }
-    .field::placeholder { color:rgba(255,255,255,0.3); font-weight:300; }
+    /* ---------- Contact form (bottom-border, theme-aware) ---------- */
+    .field { background:transparent; border:none; border-bottom:1px solid var(--field-border); border-radius:0; padding:0.85rem 0; width:100%; font-family:'Montserrat',sans-serif; font-weight:300; color:var(--text); transition:border-color .3s var(--ease); }
+    .field:focus { outline:none; border-bottom-color:var(--text); }
+    .field::placeholder { color:var(--field-ph); font-weight:300; }
 
     ::-webkit-scrollbar { width:8px; height:8px; }
-    ::-webkit-scrollbar-track { background:#0a0a0a; }
-    ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.18); }
-    ::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.35); }
+    ::-webkit-scrollbar-track { background:var(--bg); }
+    ::-webkit-scrollbar-thumb { background:var(--line); }
+    ::-webkit-scrollbar-thumb:hover { background:var(--text-faint); }
 
     #app { animation: appIn .8s var(--ease) both; }
     @keyframes appIn { from{opacity:0;} to{opacity:1;} }
@@ -91,77 +235,85 @@
   </style>
 </head>
 
-<body class="bg-[#0a0a0a] text-white min-h-screen flex flex-col antialiased">
+<body class="min-h-screen flex flex-col antialiased" style="background:var(--bg); color:var(--text);">
   <div id="app" class="flex-1 flex flex-col">
 
-    <!-- ===================== HEADER ===================== -->
-    <header class="sticky top-0 z-40 bg-[#0a0a0a]/85 backdrop-blur-md border-b border-white/5">
-      <div class="flex items-center justify-between px-5 md:px-12 py-4 md:py-5">
-        <!-- Logo + name -->
-        <a href="#" onclick="goHome(); return false;" class="flex items-center gap-3 md:gap-4 group">
-          <img src="/brand/logo.webp" alt="Takes Two Studio" class="h-7 md:h-9 w-auto logo-invert" />
-          <span class="hidden sm:inline-block w-px h-5 bg-white/20 self-center"></span>
-          <span class="hidden sm:flex flex-col leading-none">
-            <span class="font-serif text-base md:text-lg tracking-wide">Takes Two Studio</span>
-            <span class="text-[9px] md:text-[10px] tracking-[0.28em] uppercase text-white/40 font-light mt-1">Advertising &amp; Food &amp; Beverage</span>
-          </span>
+    <!-- ===================== FLOATING HEADER ===================== -->
+    <header id="floating-header" class="floating-header">
+      <div class="floating-bar">
+        <!-- Logo (left) -->
+        <a href="#" onclick="goHome(); return false;" class="flex items-center group flex-shrink-0">
+          <img id="site-logo" src="/brand/logo.webp" alt="Takes Two Studio" class="h-7 md:h-9 w-auto logo-themed" />
         </a>
 
-        <!-- Desktop nav -->
-        <nav class="hidden md:flex items-center gap-12 text-[11px] tracking-[0.22em] uppercase font-light">
-          <div class="dropdown relative">
-            <button class="nav-link flex items-center gap-1.5" aria-haspopup="true">
-              Portfolios
-              <svg class="w-2.5 h-2.5 opacity-50" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1"/></svg>
-            </button>
-            <div class="dropdown-menu absolute top-full right-0 mt-5 bg-[#0a0a0a] border border-white/10 py-4 min-w-[210px] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]">
-              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('overview'); return false;">Overview</a>
-              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('advertising'); return false;">Advertising</a>
-              <a class="dropdown-item block px-7 py-2.5 text-[11px] tracking-[0.22em] uppercase cursor-pointer" onclick="filterPortfolio('food-beverage'); return false;">Food &amp; Beverage</a>
-            </div>
-          </div>
-          <a class="nav-link" onclick="showView('about-view'); return false;">About</a>
-          <a class="nav-link" onclick="showView('contact-view'); return false;">Contact</a>
-        </nav>
+        <!-- Desktop nav (centered) -->
+        <div class="nav-section">
+          <nav id="desktop-nav" class="hidden md:flex items-center justify-center gap-8 lg:gap-10 text-[10px] md:text-[11px] tracking-[0.22em] uppercase font-light"></nav>
+        </div>
 
-        <!-- Mobile hamburger -->
-        <button class="md:hidden flex flex-col gap-[5px] p-2" onclick="toggleMobileMenu()" aria-label="Menu">
-          <span class="block w-6 h-px bg-white"></span>
-          <span class="block w-6 h-px bg-white"></span>
-          <span class="block w-6 h-px bg-white"></span>
-        </button>
+        <!-- Right side: theme toggle + hamburger -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <button id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme" class="p-2 t-text hover:opacity-60 transition-opacity">
+            <svg id="theme-icon-moon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+            <svg id="theme-icon-sun" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          </button>
+          <button class="md:hidden flex flex-col gap-[5px] p-2" onclick="toggleMobileMenu()" aria-label="Menu">
+            <span class="block w-5 h-px" style="background:var(--text);"></span>
+            <span class="block w-5 h-px" style="background:var(--text);"></span>
+            <span class="block w-5 h-px" style="background:var(--text);"></span>
+          </button>
+        </div>
       </div>
 
-      <!-- Mobile menu -->
-      <div id="mobile-menu" class="mobile-menu md:hidden border-t border-white/5 bg-[#0a0a0a]">
-        <div class="px-5 py-4 flex flex-col text-[12px] tracking-[0.22em] uppercase font-light">
-          <a class="py-3 border-b border-white/5 cursor-pointer" onclick="filterPortfolio('overview'); closeMobileMenu();">Portfolios — Overview</a>
-          <a class="py-3 pl-4 border-b border-white/5 cursor-pointer text-white/60" onclick="filterPortfolio('advertising'); closeMobileMenu();">Advertising</a>
-          <a class="py-3 pl-4 border-b border-white/5 cursor-pointer text-white/60" onclick="filterPortfolio('food-beverage'); closeMobileMenu();">Food &amp; Beverage</a>
-          <a class="py-3 border-b border-white/5 cursor-pointer" onclick="showView('about-view'); closeMobileMenu();">About</a>
-          <a class="py-3 cursor-pointer" onclick="showView('contact-view'); closeMobileMenu();">Contact</a>
+      <!-- Mobile menu (floating dropdown below the bar — dark grey to match the bar) -->
+      <div id="mobile-menu" class="mobile-menu md:hidden" style="max-width:1280px; margin:0 auto;">
+        <div class="mt-2 rounded-2xl border overflow-hidden" style="background: var(--bar-bg-scrolled); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-color: var(--bar-border);">
+          <div id="mobile-nav" class="px-6 py-4 flex flex-col text-[12px] tracking-[0.22em] uppercase font-light items-end text-right" style="color:#fff;"></div>
         </div>
       </div>
     </header>
+
+    <!-- spacer so non-hero content doesn't hide under the floating bar -->
+    <div id="nav-spacer" style="height:88px;" aria-hidden="true"></div>
 
     <!-- ===================== MAIN ===================== -->
     <main class="flex-1">
 
       <!-- ========== PORTFOLIO VIEW ========== -->
       <section id="portfolio-view" class="view active">
-        <div class="px-5 md:px-12 pt-14 md:pt-20 pb-8 md:pb-10 max-w-screen-2xl">
+        <!-- ========== HERO SLIDESHOW (Overview only) ========== -->
+        <div id="hero-wrap">
+          <div id="hero-slideshow" class="hero-slideshow">
+            <!-- slides injected by JS -->
+            <div class="hero-overlay"></div>
+            <div class="hero-content">
+              <p id="hero-subtitle" class="hero-tag text-[10px] md:text-[11px] tracking-[0.4em] uppercase text-white/70 mb-5 font-light">Takes Two Studio</p>
+              <h1 id="hero-title" class="hero-title font-serif text-4xl md:text-7xl lg:text-8xl leading-[1.02] text-white">Two perspectives.<br/><em class="text-white/80">One frame.</em></h1>
+              <p id="hero-tag" class="hero-tag text-[10px] md:text-[11px] tracking-[0.3em] uppercase text-white/50 mt-7 font-light">Advertising &amp; Food &amp; Beverage — Cairo</p>
+            </div>
+            <div id="hero-dots" class="hero-dots"></div>
+            <div class="hero-scroll">
+              <span class="text-[9px] tracking-[0.3em] uppercase text-white/40 font-light">Scroll</span>
+              <svg class="w-4 h-4 text-white/40" viewBox="0 0 16 16" fill="none"><path d="M8 2v11M3 8l5 5 5-5" stroke="currentColor" stroke-width="1"/></svg>
+            </div>
+            <div id="hero-progress" class="hero-progress"></div>
+          </div>
+        </div>
+
+        <!-- ========== GRID HEADER ========== -->
+        <div id="portfolio-header" class="px-5 md:px-12 pt-14 md:pt-20 pb-8 md:pb-10 max-w-screen-2xl">
           <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
-              <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-4">Selected Works</p>
-              <h1 class="font-serif text-4xl md:text-6xl leading-[1.05]">Two perspectives.<br/>One obsession with<br/><em class="text-white/70">the perfect still.</em></h1>
+              <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-4" id="portfolio-eyebrow">Selected Works</p>
+              <h2 class="font-serif text-3xl md:text-5xl leading-[1.1] t-text" id="portfolio-heading">The full archive.<br/><em class="t-text-soft">Every project, one frame at a time.</em></h2>
             </div>
-            <div class="flex items-center gap-5 text-[10px] tracking-[0.3em] uppercase text-white/40">
+            <div class="flex items-center gap-5 text-[10px] tracking-[0.3em] uppercase t-text-faint">
               <span id="filter-label">Overview</span>
-              <span class="w-8 h-px bg-white/20"></span>
+              <span class="w-8 h-px t-line"></span>
               <span id="filter-count">—</span>
             </div>
           </div>
-          <p class="text-[11px] text-white/40 mt-6 max-w-md font-light">Click any project to open its full gallery.</p>
+          <p class="text-[11px] t-text-faint mt-6 max-w-md font-light" id="portfolio-hint">Click any project to open its full gallery.</p>
         </div>
         <div id="masonry-grid" class="masonry w-full">
           <!-- skeletons while loading -->
@@ -174,18 +326,18 @@
       <!-- ========== PROJECT DETAIL VIEW ========== -->
       <section id="project-view" class="view">
         <div class="px-5 md:px-12 pt-10 md:pt-14 pb-6 max-w-screen-2xl">
-          <button onclick="showView('portfolio-view')" class="text-[11px] tracking-[0.2em] uppercase text-white/50 hover:text-white mb-6 inline-flex items-center gap-2">
+          <button onclick="if(location.hash){history.pushState(null,'',location.pathname);} showView('portfolio-view')" class="text-[11px] tracking-[0.2em] uppercase t-text-soft hover:opacity-60 mb-6 inline-flex items-center gap-2">
             <svg class="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M7 2L3 6l4 4" stroke="currentColor" stroke-width="1"/></svg>
             Back to Portfolios
           </button>
           <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div>
-              <p id="project-category" class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-4"></p>
-              <h1 id="project-title" class="font-serif text-4xl md:text-6xl leading-[1.05]"></h1>
+              <p id="project-category" class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-4"></p>
+              <h1 id="project-title" class="font-serif text-4xl md:text-6xl leading-[1.05] t-text"></h1>
             </div>
-            <p id="project-count" class="text-[10px] tracking-[0.3em] uppercase text-white/40"></p>
+            <p id="project-count" class="text-[10px] tracking-[0.3em] uppercase t-text-faint"></p>
           </div>
-          <p id="project-description" class="text-[15px] leading-[1.9] text-white/70 font-light mt-8 max-w-2xl"></p>
+          <p id="project-description" class="text-[15px] leading-[1.9] t-text-soft font-light mt-8 max-w-2xl"></p>
         </div>
         <div id="project-grid" class="masonry w-full mt-8"></div>
       </section>
@@ -198,28 +350,28 @@
               <div class="overflow-hidden">
                 <img src="/brand/about.webp" alt="Takes Two Studio founders — Mohamed Medhat & Ahmed Okasha" class="w-full h-auto object-cover" />
               </div>
-              <p class="mt-5 text-[10px] tracking-[0.3em] uppercase text-white/40">Cairo · Egypt</p>
+              <p id="about-location" class="mt-5 text-[10px] tracking-[0.3em] uppercase t-text-faint">Cairo · Egypt</p>
             </div>
             <div class="reveal" style="transition-delay:0.15s;">
-              <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-6">The Studio</p>
-              <h2 class="font-serif text-4xl md:text-5xl leading-[1.1] mb-8">About Takes Two</h2>
-              <div class="space-y-6 text-[15px] leading-[1.9] text-white/75 font-light max-w-md">
-                <p>Takes Two Studio was founded by two creative Egyptian photographers — <span class="text-white">Mohamed Medhat</span> and <span class="text-white">Ahmed Okasha</span> — who embarked on this artistic journey from the very beginning of their studies in the visual arts.</p>
+              <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-6" id="about-eyebrow">The Studio</p>
+              <h2 class="font-serif text-4xl md:text-5xl leading-[1.1] mb-8 t-text" id="about-heading">About Takes Two</h2>
+              <div class="space-y-6 text-[15px] leading-[1.9] t-text-soft font-light max-w-md" id="about-body">
+                <p>Takes Two Studio was founded by two creative Egyptian photographers — <span class="t-text">Mohamed Medhat</span> and <span class="t-text">Ahmed Okasha</span> — who embarked on this artistic journey from the very beginning of their studies in the visual arts.</p>
                 <p>Photography has always been their favorite medium; they have dedicated themselves to mastering the craft since 2017. After exploring many genres, they discovered their true calling in creating compelling still visuals for advertising campaigns, television commercials, and food &amp; beverage imagery.</p>
                 <p>As a team of two, they blend artistic perspective with technical precision — completing one another's strengths and pushing the boundaries of creativity while ensuring attention to detail in every project.</p>
               </div>
               <div class="mt-12">
-                <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-6">Capabilities</p>
-                <ul class="grid grid-cols-2 gap-y-3 gap-x-8 font-serif text-lg italic text-white/85">
+                <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-6">Capabilities</p>
+                <ul class="grid grid-cols-2 gap-y-3 gap-x-8 font-serif text-lg italic t-text" id="about-capabilities">
                   <li>Advertising Campaigns</li><li>TV Commercials</li>
                   <li>Food &amp; Beverage</li><li>Product Stills</li>
                   <li>Automotive</li><li>Beverage</li>
                   <li>Creative Direction</li><li>Post-Production</li>
                 </ul>
               </div>
-              <div class="mt-12 pt-8 border-t border-white/10">
-                <p class="font-serif text-2xl md:text-3xl italic leading-snug text-white/85">"Two perspectives.<br/>One frame."</p>
-                <p class="mt-4 text-[10px] tracking-[0.3em] uppercase text-white/40">Takes Two Studio · Est. 2017</p>
+              <div class="mt-12 pt-8 t-border" style="border-top:1px solid var(--border);">
+                <p class="font-serif text-2xl md:text-3xl italic leading-snug t-text" id="about-quote">"Two perspectives.<br/>One frame."</p>
+                <p class="mt-4 text-[10px] tracking-[0.3em] uppercase t-text-faint">Takes Two Studio · Est. 2017</p>
               </div>
             </div>
           </div>
@@ -230,62 +382,66 @@
       <section id="contact-view" class="view">
         <div class="px-5 md:px-6 py-20 md:py-28 max-w-xl mx-auto w-full">
           <div class="text-center mb-14 reveal">
-            <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-5">Get in Touch</p>
-            <h2 class="font-serif text-4xl md:text-5xl leading-tight">For bookings<br/><em>&amp; inquiries.</em></h2>
+            <p id="contact-eyebrow" class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-5">Get in Touch</p>
+            <h2 id="contact-heading" class="font-serif text-4xl md:text-5xl leading-tight t-text">For bookings<br/><em>&amp; inquiries.</em></h2>
           </div>
           <div class="space-y-8 mb-16 reveal" style="transition-delay:0.1s;">
             <div class="text-center">
-              <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">General</p>
+              <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-2">General</p>
               <a href="mailto:info@takestwostudio.com" class="text-lg md:text-xl font-light hover:opacity-60 transition-opacity">info@takestwostudio.com</a>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 text-center">
               <div>
-                <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Bookings — Mohamed</p>
-                <a href="mailto:M.medhat@takestwostudio.com" class="text-sm font-light text-white/70 hover:opacity-60 transition-opacity break-all">M.medhat@takestwostudio.com</a>
+                <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-2">Bookings — Mohamed</p>
+                <a href="mailto:M.medhat@takestwostudio.com" class="text-sm font-light t-text-soft hover:opacity-60 transition-opacity break-all">M.medhat@takestwostudio.com</a>
               </div>
               <div>
-                <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Bookings — Okasha</p>
-                <a href="mailto:Okasha@takestwostudio.com" class="text-sm font-light text-white/70 hover:opacity-60 transition-opacity break-all">Okasha@takestwostudio.com</a>
+                <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-2">Bookings — Okasha</p>
+                <a href="mailto:Okasha@takestwostudio.com" class="text-sm font-light t-text-soft hover:opacity-60 transition-opacity break-all">Okasha@takestwostudio.com</a>
               </div>
             </div>
             <div class="grid grid-cols-2 gap-8 text-center">
               <div>
-                <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Cairo, Egypt</p>
-                <a href="tel:+201100900617" class="block text-sm font-light text-white/70 hover:opacity-60 transition-opacity">+20 110 090 0617</a>
-                <a href="tel:+201143219416" class="block text-sm font-light text-white/70 hover:opacity-60 transition-opacity">+20 114 321 9416</a>
+                <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-2">Cairo, Egypt</p>
+                <a href="tel:+201100900617" class="block text-sm font-light t-text-soft hover:opacity-60 transition-opacity">+20 110 090 0617</a>
+                <a href="tel:+201143219416" class="block text-sm font-light t-text-soft hover:opacity-60 transition-opacity">+20 114 321 9416</a>
               </div>
               <div>
-                <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Riyadh, KSA</p>
-                <a href="tel:+966567422977" class="block text-sm font-light text-white/70 hover:opacity-60 transition-opacity">+966 56 742 2977</a>
+                <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-2">Riyadh, KSA</p>
+                <a href="tel:+966567422977" class="block text-sm font-light t-text-soft hover:opacity-60 transition-opacity">+966 56 742 2977</a>
+                <a href="https://wa.me/966567422977" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 mt-1 text-sm font-light t-text-soft hover:opacity-60 transition-opacity" title="Chat on WhatsApp">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" style="color:#25D366;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                  <span>WhatsApp</span>
+                </a>
               </div>
             </div>
             <div class="text-center pt-2">
-              <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Studio Management</p>
-              <p class="text-sm font-light text-white/70">Hazem Kamal</p>
-              <a href="mailto:Hazem@takestwostudio.com" class="text-sm font-light text-white/70 hover:opacity-60 transition-opacity">Hazem@takestwostudio.com</a>
+              <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-2">Studio Management</p>
+              <p class="text-sm font-light t-text-soft">Hazem Kamal</p>
+              <a href="mailto:Hazem@takestwostudio.com" class="text-sm font-light t-text-soft hover:opacity-60 transition-opacity">Hazem@takestwostudio.com</a>
             </div>
           </div>
           <form id="contact-form" class="space-y-8 reveal" style="transition-delay:0.2s;" onsubmit="return submitForm(event);">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-8">
               <div>
-                <label class="block text-[10px] tracking-[0.3em] uppercase text-white/40 mb-1" for="firstname">First Name</label>
+                <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="firstname">First Name</label>
                 <input id="firstname" name="firstname" type="text" class="field" placeholder="First name" required />
               </div>
               <div>
-                <label class="block text-[10px] tracking-[0.3em] uppercase text-white/40 mb-1" for="lastname">Last Name</label>
+                <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="lastname">Last Name</label>
                 <input id="lastname" name="lastname" type="text" class="field" placeholder="Last name" required />
               </div>
             </div>
             <div>
-              <label class="block text-[10px] tracking-[0.3em] uppercase text-white/40 mb-1" for="phone">Phone Number</label>
+              <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="phone">Phone Number</label>
               <input id="phone" name="phone" type="tel" class="field" placeholder="+20 ..." required />
             </div>
             <div>
-              <label class="block text-[10px] tracking-[0.3em] uppercase text-white/40 mb-1" for="email">Email</label>
+              <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="email">Email</label>
               <input id="email" name="email" type="email" class="field" placeholder="you@studio.com" required />
             </div>
             <div>
-              <label class="block text-[10px] tracking-[0.3em] uppercase text-white/40 mb-1" for="message">Message</label>
+              <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="message">Message</label>
               <textarea id="message" name="message" rows="4" class="field resize-none" placeholder="Tell us about your project..." required></textarea>
             </div>
             <div class="pt-2">
@@ -294,45 +450,51 @@
                 <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" stroke-width="1"/></svg>
               </button>
             </div>
-            <p id="form-status" class="text-[11px] tracking-[0.2em] uppercase text-white/50 h-4"></p>
+            <p id="form-status" class="text-[11px] tracking-[0.2em] uppercase t-text-faint h-4"></p>
           </form>
+        </div>
+      </section>
+
+      <!-- ========== CLIENTS VIEW ========== -->
+      <section id="clients-view" class="view">
+        <div class="px-5 md:px-12 py-20 md:py-28 max-w-screen-xl mx-auto w-full">
+          <div class="text-center mb-16 reveal">
+            <p id="clients-eyebrow" class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-5">Trusted By</p>
+            <h2 id="clients-heading" class="font-serif text-4xl md:text-6xl leading-tight t-text">Our <em>Clients</em></h2>
+            <p id="clients-subtext" class="t-text-faint text-sm mt-6 max-w-md mx-auto font-light">Brands and publications we've had the privilege of creating with.</p>
+          </div>
+          <div id="clients-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-px bg-white/5 border border-white/5 reveal" style="transition-delay:0.1s;"></div>
         </div>
       </section>
 
     </main>
 
-    <!-- ===================== FOOTER ===================== -->
-    <footer class="mt-auto bg-black text-white">
+    <!-- ===================== FOOTER (always dark grey, anchors the page) ===================== -->
+    <footer class="mt-auto" style="background:#141416; border-top:1px solid rgba(255,255,255,0.08); color:#fff;">
       <div class="px-5 md:px-12 py-14">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8 max-w-screen-2xl">
           <div>
             <div class="flex items-center gap-3 mb-4">
-              <img src="/brand/logo.webp" alt="Takes Two Studio" class="h-8 w-auto logo-invert" />
-              <span class="font-serif text-lg">Takes Two Studio</span>
+              <img id="footer-logo" src="/brand/logo.webp" alt="Takes Two Studio" class="h-8 w-auto" style="filter:none;" />
+              <span class="font-serif text-lg" style="color:#fff;" id="footer-name">Takes Two Studio</span>
             </div>
-            <p class="text-[11px] tracking-[0.25em] uppercase text-white/50 font-light leading-relaxed">Advertising &amp; Food<br/>&amp; Beverage Photography</p>
+            <p class="text-[11px] tracking-[0.25em] uppercase font-light leading-relaxed" style="color:rgba(255,255,255,0.5);" id="footer-subtitle">Advertising &amp; Food<br/>&amp; Beverage Photography</p>
           </div>
           <div>
-            <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-4">Navigate</p>
-            <ul class="space-y-2 text-sm font-light">
-              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="filterPortfolio('overview'); return false;">Overview</a></li>
-              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="filterPortfolio('advertising'); return false;">Advertising</a></li>
-              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="filterPortfolio('food-beverage'); return false;">Food &amp; Beverage</a></li>
-              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="showView('about-view'); return false;">About</a></li>
-              <li><a class="hover:text-white/60 transition-colors cursor-pointer" onclick="showView('contact-view'); return false;">Contact</a></li>
-            </ul>
+            <p class="text-[10px] tracking-[0.3em] uppercase mb-4" style="color:rgba(255,255,255,0.4);">Navigate</p>
+            <ul id="footer-nav" class="space-y-2 text-sm font-light" style="color:rgba(255,255,255,0.7);"></ul>
           </div>
           <div>
-            <p class="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-4">Connect</p>
-            <ul class="space-y-2 text-sm font-light">
-              <li><a href="mailto:info@takestwostudio.com" class="hover:text-white/60 transition-colors break-all">info@takestwostudio.com</a></li>
-              <li class="text-white/60">Cairo, Egypt</li>
-              <li class="text-white/60">Riyadh, KSA</li>
-              <li><a href="/admin" class="text-white/30 hover:text-white/60 transition-colors text-[10px] tracking-[0.2em] uppercase">Admin</a></li>
+            <p class="text-[10px] tracking-[0.3em] uppercase mb-4" style="color:rgba(255,255,255,0.4);">Connect</p>
+            <ul class="space-y-2 text-sm font-light" style="color:rgba(255,255,255,0.7);">
+              <li><a href="mailto:info@takestwostudio.com" class="hover:opacity-60 transition-opacity break-all">info@takestwostudio.com</a></li>
+              <li style="color:rgba(255,255,255,0.5);">Cairo, Egypt</li>
+              <li style="color:rgba(255,255,255,0.5);">Riyadh, KSA</li>
+              <li><a href="/admin" class="hover:opacity-60 transition-opacity text-[10px] tracking-[0.2em] uppercase" style="color:rgba(255,255,255,0.3);">Admin</a></li>
             </ul>
           </div>
         </div>
-        <div class="mt-12 pt-6 border-t border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-[10px] tracking-[0.25em] uppercase text-white/40 font-light">
+        <div class="mt-12 pt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-[10px] tracking-[0.25em] uppercase font-light" style="border-top:1px solid rgba(255,255,255,0.08); color:rgba(255,255,255,0.4);">
           <span>© Takes Two Studio. All Rights Reserved.</span>
           <span>Cairo · Riyadh · Middle East</span>
         </div>
@@ -348,6 +510,7 @@
     <figure class="flex flex-col items-center max-w-[90vw] max-h-[90vh]">
       <img id="lightbox-img" class="lb-img max-h-[82vh] max-w-[88vw] object-contain" src="" alt="" />
       <figcaption id="lightbox-caption" class="lb-fade mt-5 text-white/70 text-[10px] tracking-[0.3em] uppercase text-center"></figcaption>
+      <a id="lightbox-project-link" href="#" onclick="openLightboxProject(); return false;" class="lb-fade mt-3 text-white/50 hover:text-white text-[10px] tracking-[0.3em] uppercase underline underline-offset-4 hidden">View full project →</a>
     </figure>
     <button onclick="nextImage()" aria-label="Next" class="absolute right-3 md:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl md:text-6xl font-light leading-none transition-colors px-2">›</button>
     <div id="lightbox-counter" class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/40 text-[10px] tracking-[0.3em] uppercase"></div>
@@ -362,11 +525,22 @@
     let currentProjectImages = [];  // images of the open project
     let lbIndex = 0;
 
+    /* ---------- Slideshow state ---------- */
+    let heroSlides = [];       // project objects used in the hero
+    let heroIndex = 0;
+    let heroTimer = null;
+    const HERO_INTERVAL = 5000;
+
     /* ---------- API ---------- */
     async function fetchProjects(category) {
       const r = await fetch(`/api/projects?category=${encodeURIComponent(category)}`, { cache: 'no-store' });
       const j = await r.json();
       return j.projects || [];
+    }
+    async function fetchOverview() {
+      const r = await fetch('/api/overview', { cache: 'no-store' });
+      const j = await r.json();
+      return j.items || [];
     }
     async function fetchProject(id) {
       const r = await fetch(`/api/projects/${id}`, { cache: 'no-store' });
@@ -377,6 +551,109 @@
       const r = await fetch('/api/inquiries', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
       return r.ok;
     }
+    async function fetchSettings() {
+      const r = await fetch('/api/settings', { cache: 'no-store' });
+      const j = await r.json();
+      return { sections: j.sections || [], clients: j.clients || [], siteSettings: j.siteSettings || {} };
+    }
+
+    /* ---------- Section config (drives the nav) ---------- */
+    let siteSections = [];
+    let siteClients = [];
+    let siteSettings = {};
+
+    /* ---------- Theme ---------- */
+    function getTheme() { return document.documentElement.getAttribute('data-theme') || 'dark'; }
+    function applyTheme(t) {
+      document.documentElement.setAttribute('data-theme', t);
+      try { localStorage.setItem('tts-theme', t); } catch(e) {}
+      // toggle the icon visibility
+      const moon = document.getElementById('theme-icon-moon');
+      const sun = document.getElementById('theme-icon-sun');
+      if (moon && sun) {
+        moon.classList.toggle('hidden', t === 'dark');   // show moon icon in light mode (click → go dark)
+        sun.classList.toggle('hidden', t === 'light');   // show sun icon in dark mode (click → go light)
+      }
+    }
+    function toggleTheme() {
+      applyTheme(getTheme() === 'dark' ? 'light' : 'dark');
+    }
+
+    function sectionLabel(key) {
+      const s = siteSections.find(x => x.key === key);
+      return s ? s.label : key;
+    }
+    function sectionVisible(key) {
+      const s = siteSections.find(x => x.key === key);
+      return s ? s.visible : true;
+    }
+    function navAction(key) {
+      if (key === 'overview' || key === 'advertising' || key === 'food-beverage') {
+        return () => filterPortfolio(key);
+      }
+      return () => showView(key + '-view');
+    }
+
+    function renderNav() {
+      const desktop = document.getElementById('desktop-nav');
+      const mobile = document.getElementById('mobile-nav');
+      const footer = document.getElementById('footer-nav');
+      if (desktop) desktop.innerHTML = '';
+      if (mobile) mobile.innerHTML = '';
+      if (footer) footer.innerHTML = '';
+
+      siteSections.filter(s => s.visible).forEach(s => {
+        // Desktop
+        if (desktop) {
+          const a = document.createElement('a');
+          a.className = 'nav-link';
+          a.dataset.section = s.key; // store the section key for active-state matching
+          a.textContent = s.label;
+          a.onclick = (e) => { e.preventDefault(); navAction(s.key)(); };
+          a.style.cursor = 'pointer';
+          desktop.appendChild(a);
+        }
+        // Mobile
+        if (mobile) {
+          const a = document.createElement('a');
+          a.className = 'py-3 border-b border-white/5 cursor-pointer';
+          a.textContent = s.label;
+          a.onclick = (e) => { e.preventDefault(); navAction(s.key)(); closeMobileMenu(); };
+          mobile.appendChild(a);
+        }
+        // Footer
+        if (footer) {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.className = 'hover:opacity-60 transition-opacity cursor-pointer';
+          a.style.color = 'rgba(255,255,255,0.7)';
+          a.textContent = s.label;
+          a.onclick = (e) => { e.preventDefault(); navAction(s.key)(); };
+          li.appendChild(a);
+          footer.appendChild(li);
+        }
+      });
+    }
+
+    function renderClients() {
+      const grid = document.getElementById('clients-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      if (siteClients.length === 0) {
+        grid.innerHTML = '<p class="col-span-full text-center t-text-faint py-12 text-sm tracking-[0.2em] uppercase">Clients coming soon.</p>';
+        return;
+      }
+      siteClients.forEach(c => {
+        const cell = document.createElement('div');
+        cell.className = 'bg-[#0a0a0a] flex items-center justify-center p-8 md:p-12 min-h-[140px]';
+        if (c.logo) {
+          cell.innerHTML = `<img src="${c.logo}" alt="${escapeHtml(c.name)}" class="max-h-16 max-w-[140px] object-contain opacity-70 hover:opacity-100 transition-opacity" />`;
+        } else {
+          cell.innerHTML = `<span class="font-serif text-xl md:text-2xl italic t-text-soft">${escapeHtml(c.name)}</span>`;
+        }
+        grid.appendChild(cell);
+      });
+    }
 
     /* ---------- Render masonry (project covers) ---------- */
     function renderGallery(projects) {
@@ -385,22 +662,31 @@
       currentGallery = projects;
 
       if (projects.length === 0) {
-        grid.innerHTML = '<div class="masonry-item w-full p-12 text-center text-white/40 text-sm tracking-[0.2em] uppercase">No projects in this category yet.</div>';
+        grid.innerHTML = '<div class="masonry-item w-full p-12 text-center t-text-faint text-sm tracking-[0.2em] uppercase">No projects in this category yet.</div>';
       }
 
-      projects.forEach((p) => {
-        const figure = document.createElement('figure');
-        figure.className = 'gallery-item masonry-item relative overflow-hidden cursor-pointer bg-[#181818]';
-        // use the cover image's natural aspect by letting height auto; we set a min via aspect for skeleton feel
-        figure.innerHTML = `
-          <img src="${p.coverImage}" alt="${escapeHtml(p.title)} — Takes Two Studio" loading="lazy" class="w-full h-auto block" />
-          <div class="overlay absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4">
+      projects.forEach((p, i) => {
+        const isOverview = currentFilter === 'overview';
+        // Use an <a> element with a real href so right-click "Open in new tab" works for projects.
+        // Overview items open a lightbox (no project page), so they stay as non-link figures.
+        const el = document.createElement(isOverview ? 'figure' : 'a');
+        el.className = 'gallery-item masonry-item relative overflow-hidden cursor-pointer block';
+        if (!isOverview) {
+          el.href = '#project/' + p.id;
+        }
+        el.innerHTML = `
+          <img src="${p.coverImage}" alt="${escapeHtml(p.title)} — Takes Two Studio" loading="lazy" class="w-full h-full block object-cover" />
+          ${isOverview ? '' : `<div class="overlay absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4">
             <span class="campaign-title text-white font-serif text-xl md:text-2xl text-center">${escapeHtml(p.title)}</span>
             <span class="campaign-title text-white/60 text-[10px] tracking-[0.3em] uppercase mt-3 text-center">${p.images.length} image${p.images.length!==1?'s':''} · ${labelFor(p.category)}</span>
-          </div>
+          </div>`}
         `;
-        figure.addEventListener('click', () => openProject(p.id));
-        grid.appendChild(figure);
+        // Normal click: SPA navigation (prevent default so no page reload)
+        el.addEventListener('click', (e) => {
+          if (isOverview) { e.preventDefault(); openGalleryLightbox(i); }
+          else { e.preventDefault(); openProject(p.id); }
+        });
+        grid.appendChild(el);
       });
 
       const count = document.getElementById('filter-count');
@@ -408,6 +694,9 @@
     }
 
     function labelFor(cat) {
+      // prefer the admin-configured label, fall back to defaults
+      const fromSettings = sectionLabel(cat);
+      if (fromSettings && fromSettings !== cat) return fromSettings;
       return { advertising:'Advertising', 'food-beverage':'Food & Beverage', overview:'Overview' }[cat] || cat;
     }
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -418,16 +707,164 @@
       const label = document.getElementById('filter-label');
       if (label) label.textContent = labelFor(category);
       showView('portfolio-view');
+
+      // Hero only shows on Overview
+      const heroWrap = document.getElementById('hero-wrap');
+      const eyebrow = document.getElementById('portfolio-eyebrow');
+      const heading = document.getElementById('portfolio-heading');
+      const spacer = document.getElementById('nav-spacer');
+      if (category === 'overview') {
+        if (heroWrap) heroWrap.style.display = 'block';
+        if (spacer) spacer.style.display = 'none'; // hero is full-bleed behind the floating bar
+        if (eyebrow) eyebrow.textContent = siteSettings.portfolioEyebrow !== undefined ? siteSettings.portfolioEyebrow : '';
+        if (heading) {
+          const h = siteSettings.portfolioHeading !== undefined ? siteSettings.portfolioHeading : '';
+          const parts = h.split('.').map(s => s.trim()).filter(Boolean);
+          if (parts.length >= 2) heading.innerHTML = escapeHtml(parts[0]) + '.<br/><em class="t-text-soft">' + escapeHtml(parts.slice(1).join('. ')) + '.</em>';
+          else heading.textContent = h;
+        }
+        startSlideshow();
+      } else {
+        stopSlideshow();
+        if (heroWrap) heroWrap.style.display = 'none';
+        if (spacer) spacer.style.display = 'block'; // non-hero portfolio needs the spacer
+        if (eyebrow) eyebrow.textContent = labelFor(category);
+        if (heading) {
+          const h = category === 'advertising'
+            ? (siteSettings.advertisingHeading !== undefined ? siteSettings.advertisingHeading : '')
+            : (siteSettings.foodBeverageHeading !== undefined ? siteSettings.foodBeverageHeading : '');
+          const parts = h.split('.').map(s => s.trim()).filter(Boolean);
+          if (parts.length >= 2) heading.innerHTML = escapeHtml(parts[0]) + '.<br/><em class="t-text-soft">' + escapeHtml(parts.slice(1).join('. ')) + '.</em>';
+          else heading.textContent = h;
+        }
+      }
+
       // show skeletons
       const grid = document.getElementById('masonry-grid');
       grid.innerHTML = '<div class="masonry-item skeleton" style="aspect-ratio:3/4"></div><div class="masonry-item skeleton" style="aspect-ratio:4/3"></div><div class="masonry-item skeleton" style="aspect-ratio:4/5"></div><div class="masonry-item skeleton" style="aspect-ratio:3/4"></div>';
-      const projects = await fetchProjects(category);
-      allProjects = projects;
-      renderGallery(projects);
+      if (category === 'overview') {
+        // Overview uses the curated, ordered list from /api/overview
+        const overviewItems = await fetchOverview();
+        // shape overview items like projects for renderGallery + slideshow
+        const asProjects = overviewItems.map(it => ({
+          id: it.id,
+          title: it.caption || 'Overview',
+          category: 'overview',
+          coverImage: it.url,
+          description: null,
+          order: it.order,
+          published: true,
+          featured: false,
+          overview: true,
+          createdAt: '',
+          images: [{ id: it.id, url: it.url, caption: it.caption, order: 0, projectId: it.projectId }],
+          _projectId: it.projectId,
+        }));
+        allProjects = asProjects;
+        renderGallery(asProjects);
+        // slideshow uses featured projects from ALL projects (not just overview-flagged ones)
+        const allForSlideshow = await fetchProjects('all');
+        buildSlideshow(allForSlideshow);
+      } else {
+        const projects = await fetchProjects(category);
+        allProjects = projects;
+        renderGallery(projects);
+      }
+    }
+
+    /* ---------- Hero Slideshow ---------- */
+    function buildSlideshow(projects) {
+      // Prefer admin-curated "featured" projects; fall back to a mix of both categories.
+      const featured = projects.filter(p => p.featured);
+      let pool;
+      if (featured.length > 0) {
+        pool = featured; // use exactly the featured set (up to 12)
+      } else {
+        // fallback: alternate advertising + food-beverage
+        const ad = projects.filter(p => p.category === 'advertising');
+        const fb = projects.filter(p => p.category === 'food-beverage');
+        pool = [];
+        const max = Math.max(ad.length, fb.length);
+        for (let i = 0; i < max; i++) {
+          if (ad[i]) pool.push(ad[i]);
+          if (fb[i]) pool.push(fb[i]);
+        }
+      }
+      heroSlides = pool.slice(0, 12);
+      heroIndex = 0;
+
+      const container = document.getElementById('hero-slideshow');
+      // remove old slides (keep overlay/content/dots/progress)
+      container.querySelectorAll('.hero-slide').forEach(s => s.remove());
+
+      const dotsEl = document.getElementById('hero-dots');
+      if (dotsEl) dotsEl.innerHTML = '';
+
+      heroSlides.forEach((p, i) => {
+        const slide = document.createElement('div');
+        slide.className = 'hero-slide' + (i === 0 ? ' active' : '');
+        slide.innerHTML = `<img src="${p.coverImage}" alt="${escapeHtml(p.title)}" />`;
+        // clicking a hero slide opens the lightbox (full-size popup with next/prev)
+        slide.addEventListener('click', () => {
+          // build a lightbox set from the hero slides' covers
+          currentProjectImages = heroSlides.map(hp => ({ id: hp.id, url: hp.coverImage, caption: hp.title, order: 0, projectId: hp.id }));
+          openLightbox(i);
+        });
+        // insert before the overlay so overlay stays on top
+        container.insertBefore(slide, container.querySelector('.hero-overlay'));
+
+        if (dotsEl) {
+          const dot = document.createElement('span');
+          dot.className = 'hero-dot' + (i === 0 ? ' active' : '');
+          dot.addEventListener('click', (e) => { e.stopPropagation(); goToSlide(i); });
+          dotsEl.appendChild(dot);
+        }
+      });
+
+      restartTimer();
+    }
+
+    function startSlideshow() {
+      if (heroSlides.length === 0) return;
+      restartTimer();
+    }
+    function stopSlideshow() {
+      if (heroTimer) { clearTimeout(heroTimer); heroTimer = null; }
+      const prog = document.getElementById('hero-progress');
+      if (prog) { prog.classList.remove('run'); prog.style.width = '0'; }
+    }
+    function restartTimer() {
+      if (heroTimer) clearTimeout(heroTimer);
+      const prog = document.getElementById('hero-progress');
+      if (prog) {
+        prog.classList.remove('run');
+        // force reflow to restart the CSS animation
+        void prog.offsetWidth;
+        prog.classList.add('run');
+      }
+      heroTimer = setTimeout(() => nextHeroSlide(), HERO_INTERVAL);
+    }
+    function nextHeroSlide() {
+      if (heroSlides.length === 0) return;
+      heroIndex = (heroIndex + 1) % heroSlides.length;
+      goToSlide(heroIndex);
+    }
+    function goToSlide(i) {
+      if (heroSlides.length === 0) return;
+      heroIndex = i;
+      const slides = document.querySelectorAll('.hero-slide');
+      const dots = document.querySelectorAll('.hero-dot');
+      slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+      dots.forEach((d, idx) => d.classList.toggle('active', idx === i));
+      restartTimer();
     }
 
     /* ---------- Open a project ---------- */
     async function openProject(id) {
+      // update the URL hash so the project is shareable / new-tab-friendly
+      if (location.hash !== '#project/' + id) {
+        history.pushState(null, '', '#project/' + id);
+      }
       // load full project (in case images weren't included in list — they are, but be safe)
       let project = allProjects.find(p => p.id === id);
       // ensure we have images; fetch if missing
@@ -447,9 +884,9 @@
       pgrid.innerHTML = '';
       currentProjectImages.forEach((img, i) => {
         const figure = document.createElement('figure');
-        figure.className = 'gallery-item masonry-item relative overflow-hidden cursor-pointer bg-[#181818]';
+        figure.className = 'gallery-item masonry-item relative overflow-hidden cursor-pointer';
         figure.innerHTML = `
-          <img src="${img.url}" alt="${escapeHtml(img.caption || project.title)}" loading="lazy" class="w-full h-auto block" />
+          <img src="${img.url}" alt="${escapeHtml(img.caption || project.title)}" loading="lazy" class="w-full h-full block object-cover" />
           <div class="overlay absolute inset-0 bg-black/60 flex items-center justify-center">
             <span class="campaign-title text-white text-[10px] tracking-[0.3em] uppercase">${String(i+1).padStart(2,'0')} / ${String(currentProjectImages.length).padStart(2,'0')}</span>
           </div>
@@ -471,10 +908,29 @@
         runReveals(target);
         window.scrollTo({ top: 0, behavior: 'auto' });
       });
+      // Stop the hero slideshow when leaving the portfolio view
+      if (viewId !== 'portfolio-view') stopSlideshow();
+      // Spacer hides only on the Overview hero (full-bleed); shows on all other views
+      const spacer = document.getElementById('nav-spacer');
+      const heroWrap = document.getElementById('hero-wrap');
+      if (spacer) {
+        const isOverviewHero = (viewId === 'portfolio-view' && heroWrap && heroWrap.style.display !== 'none' && currentFilter === 'overview');
+        spacer.style.display = isOverviewHero ? 'none' : 'block';
+      }
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('is-active'));
+      // Determine which nav section should be active
+      let activeKey = null;
       if (viewId === 'portfolio-view' || viewId === 'project-view') {
-        const links = document.querySelectorAll('.nav-link');
-        if (links[0]) links[0].classList.add('is-active');
+        // for portfolio/project views, the active section = the current filter
+        activeKey = (currentFilter === 'overview') ? 'overview'
+                  : (currentFilter === 'advertising') ? 'advertising'
+                  : (currentFilter === 'food-beverage') ? 'food-beverage' : 'overview';
+      } else if (viewId === 'about-view') activeKey = 'about';
+      else if (viewId === 'contact-view') activeKey = 'contact';
+      else if (viewId === 'clients-view') activeKey = 'clients';
+      if (activeKey) {
+        const link = document.querySelector('.nav-link[data-section="' + activeKey + '"]');
+        if (link) link.classList.add('is-active');
       }
       closeMobileMenu();
     }
@@ -492,6 +948,27 @@
     function closeMobileMenu(){ document.getElementById('mobile-menu').classList.remove('open'); }
 
     /* ---------- Lightbox ---------- */
+    /* Open the lightbox from the masonry grid (cycling through the currently visible covers) */
+    function openGalleryLightbox(index) {
+      currentProjectImages = currentGallery.map(p => ({
+        id: p.id,
+        url: p.coverImage,
+        caption: p.title,
+        order: 0,
+        // only set projectId if the image is genuinely linked to a project
+        // (overview items with no project link get null → "View full project" hidden)
+        projectId: p._projectId || (p.images && p.images[0] && p.images[0].projectId) || null
+      }));
+      openLightbox(index);
+    }
+    /* Open the full project detail from a lightbox "View full project" link */
+    function openLightboxProject() {
+      const img = currentProjectImages[lbIndex];
+      if (!img || !img.projectId) return;
+      closeLightbox();
+      openProject(img.projectId);
+    }
+
     function openLightbox(index) {
       lbIndex = index;
       document.getElementById('lightbox').classList.add('open');
@@ -509,7 +986,9 @@
       const lbImg = document.getElementById('lightbox-img');
       const caption = document.getElementById('lightbox-caption');
       const counter = document.getElementById('lightbox-counter');
+      const projLink = document.getElementById('lightbox-project-link');
       lbImg.style.opacity = '0'; caption.style.opacity = '0';
+      if (projLink) projLink.style.opacity = '0';
       const tmp = new Image();
       tmp.onload = () => {
         lbImg.src = tmp.src;
@@ -517,6 +996,11 @@
         lbImg.style.opacity = '1';
         caption.textContent = img.caption || '';
         caption.style.opacity = img.caption ? '1' : '0';
+        // show "View full project" link only when the image belongs to a project
+        if (projLink) {
+          if (img.projectId) { projLink.classList.remove('hidden'); projLink.style.opacity = '1'; }
+          else { projLink.classList.add('hidden'); }
+        }
       };
       tmp.onerror = () => { lbImg.src = img.url; lbImg.style.opacity = '1'; };
       tmp.src = img.url;
@@ -565,9 +1049,139 @@
       return false;
     }
 
+    /* ---------- Floating header scroll state ---------- */
+    window.addEventListener('scroll', () => {
+      const h = document.getElementById('floating-header');
+      if (!h) return;
+      if (window.scrollY > 30) h.classList.add('scrolled');
+      else h.classList.remove('scrolled');
+    }, { passive: true });
+
+    /* ---------- Apply site settings (hero text, logo, theme) ---------- */
+    function applySiteSettings() {
+      // hero text — split the title on the first period into two lines
+      const titleEl = document.getElementById('hero-title');
+      const subtitleEl = document.getElementById('hero-subtitle');
+      const tagEl = document.getElementById('hero-tag');
+      if (subtitleEl) subtitleEl.textContent = siteSettings.heroSubtitle !== undefined ? siteSettings.heroSubtitle : '';
+      if (tagEl) tagEl.textContent = siteSettings.heroTag !== undefined ? siteSettings.heroTag : '';
+      if (titleEl) {
+        const raw = siteSettings.heroTitle !== undefined ? siteSettings.heroTitle : '';
+        const parts = raw.split('.').map(s => s.trim()).filter(Boolean);
+        if (parts.length >= 2) {
+          titleEl.innerHTML = escapeHtml(parts[0]) + '.<br/><em class="text-white/80">' + escapeHtml(parts.slice(1).join('. ')) + '.</em>';
+        } else {
+          titleEl.textContent = raw;
+        }
+      }
+      // logo
+      const logoUrl = siteSettings.logo || '/brand/logo.webp';
+      const headerLogo = document.getElementById('site-logo');
+      const footerLogo = document.getElementById('footer-logo');
+      if (headerLogo) headerLogo.src = logoUrl;
+      if (footerLogo) footerLogo.src = logoUrl;
+      // footer name + subtitle
+      const footerName = document.getElementById('footer-name');
+      const footerSubtitle = document.getElementById('footer-subtitle');
+      if (footerName) footerName.textContent = siteSettings.footerName !== undefined ? siteSettings.footerName : '';
+      if (footerSubtitle) footerSubtitle.innerHTML = (siteSettings.footerSubtitle !== undefined ? siteSettings.footerSubtitle : '').replace(/&/g, '&amp;');
+      // favicon
+      const favicon = document.querySelector('link[rel="icon"]');
+      if (favicon) favicon.href = logoUrl;
+      // default theme (only if user hasn't manually toggled — respect localStorage)
+      if (!localStorage.getItem('tts-theme') && siteSettings.theme) {
+        applyTheme(siteSettings.theme);
+      }
+
+      // --- Portfolio header texts ---
+      const pe = document.getElementById('portfolio-eyebrow');
+      const ph = document.getElementById('portfolio-hint');
+      if (pe) pe.textContent = siteSettings.portfolioEyebrow !== undefined ? siteSettings.portfolioEyebrow : '';
+      if (ph) ph.textContent = siteSettings.portfolioHint !== undefined ? siteSettings.portfolioHint : '';
+
+      // --- About page texts ---
+      const ae = document.getElementById('about-eyebrow');
+      const ah = document.getElementById('about-heading');
+      const ab = document.getElementById('about-body');
+      const ac = document.getElementById('about-capabilities');
+      const aq = document.getElementById('about-quote');
+      if (ae) ae.textContent = siteSettings.aboutEyebrow !== undefined ? siteSettings.aboutEyebrow : '';
+      if (ah) ah.textContent = siteSettings.aboutHeading !== undefined ? siteSettings.aboutHeading : '';
+      if (ab) {
+        const body = siteSettings.aboutBody || '';
+        ab.innerHTML = body.split('\n\n').map(p => '<p>' + escapeHtml(p).replace(/—/g,'—') + '</p>').join('');
+      }
+      if (ac) {
+        const caps = (siteSettings.aboutCapabilities || '').split(',').map(s => s.trim()).filter(Boolean);
+        ac.innerHTML = caps.map(c => '<li>' + escapeHtml(c) + '</li>').join('');
+      }
+      if (aq) {
+        const q = siteSettings.aboutQuote !== undefined ? siteSettings.aboutQuote : '';
+        const parts = q.split('.').map(s => s.trim()).filter(Boolean);
+        if (parts.length >= 2) aq.innerHTML = '"' + escapeHtml(parts[0]) + '.<br/>' + escapeHtml(parts.slice(1).join('. ')) + '."';
+        else aq.textContent = '"' + q + '"';
+      }
+      const aloc = document.getElementById('about-location');
+      if (aloc) aloc.textContent = siteSettings.aboutLocation !== undefined ? siteSettings.aboutLocation : '';
+
+      // --- Clients page texts ---
+      const ce = document.querySelector('#clients-view .t-text-faint');
+      const ch = document.querySelector('#clients-view h2');
+      const cs = document.querySelector('#clients-view p.t-text-faint.text-sm');
+      // These are set via querySelector; more reliable to use IDs
+      const ceEl = document.getElementById('clients-eyebrow');
+      const chEl = document.getElementById('clients-heading');
+      const csEl = document.getElementById('clients-subtext');
+      if (ceEl) ceEl.textContent = siteSettings.clientsEyebrow !== undefined ? siteSettings.clientsEyebrow : '';
+      if (chEl) chEl.innerHTML = siteSettings.clientsHeading !== undefined ? siteSettings.clientsHeading : '';
+      if (csEl) csEl.textContent = siteSettings.clientsSubtext || '';
+
+      // --- Contact page texts ---
+      const coe = document.getElementById('contact-eyebrow');
+      const coh = document.getElementById('contact-heading');
+      if (coe) coe.textContent = siteSettings.contactEyebrow !== undefined ? siteSettings.contactEyebrow : '';
+      if (coh) {
+        const h = siteSettings.contactHeading !== undefined ? siteSettings.contactHeading : '';
+        const parts = h.split('.').map(s => s.trim()).filter(Boolean);
+        if (parts.length >= 2) coh.innerHTML = escapeHtml(parts[0]) + '.<br/><em>' + escapeHtml(parts.slice(1).join('. ')) + '.</em>';
+        else coh.textContent = h;
+      }
+    }
+
+    /* ---------- Hash routing: open a project from #project/<id> (new tab / shared link) ---------- */
+    function handleHashRoute() {
+      const hash = location.hash;
+      const m = hash.match(/^#project\/(.+)$/);
+      if (m && m[1]) {
+        openProject(m[1]);
+        return true;
+      }
+      return false;
+    }
+    window.addEventListener('hashchange', () => { handleHashRoute(); });
+
     /* ---------- Init ---------- */
-    document.addEventListener('DOMContentLoaded', () => {
-      filterPortfolio('overview');
+    document.addEventListener('DOMContentLoaded', async () => {
+      // set the theme icon to match the initial theme
+      applyTheme(getTheme());
+      // Load site settings (nav sections + clients + site config) first
+      try {
+        const s = await fetchSettings();
+        siteSections = s.sections;
+        siteClients = s.clients;
+        siteSettings = s.siteSettings;
+        renderNav();
+        renderClients();
+        applySiteSettings();
+      } catch (e) { console.warn('settings load failed', e); }
+      // If the URL has a #project/<id> hash, open that project directly (new-tab support)
+      if (location.hash && location.hash.startsWith('#project/')) {
+        // load the portfolio first, then open the project
+        await filterPortfolio('overview');
+        handleHashRoute();
+      } else {
+        filterPortfolio('overview');
+      }
     });
   </script>
 </body>

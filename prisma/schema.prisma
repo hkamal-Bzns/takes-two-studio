@@ -26,6 +26,8 @@ model Project {
   description String?
   order       Int      @default(0)
   published   Boolean  @default(true)
+  featured    Boolean  @default(false) // shown in the homepage slideshow
+  overview    Boolean  @default(false) // shown on the Overview homepage grid
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   images      ProjectImage[]
@@ -56,4 +58,54 @@ model Inquiry {
   createdAt DateTime @default(now())
 
   @@index([status])
+}
+
+// Navigation / section visibility — admin can toggle & relabel
+model SiteSection {
+  id        String   @id @default(cuid())
+  key       String   @unique // "overview" | "advertising" | "food-beverage" | "about" | "contact" | "clients"
+  label     String   // display name in the nav
+  visible   Boolean  @default(true)
+  order     Int      @default(0)
+}
+
+// Flexible key/value store for global site config
+// (hero title/subtitle/tag, logo url, default theme, etc.)
+model SiteSetting {
+  key       String   @id // e.g. "heroTitle", "heroSubtitle", "heroTag", "logo", "theme"
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// Client entries shown on the Clients page
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  logo      String?  // optional logo image URL
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+// Curated, ordered images for the Overview homepage grid.
+// Each item references any image (project cover or gallery shot) + optional project link.
+model OverviewItem {
+  id        String   @id @default(cuid())
+  url       String
+  projectId String?  // optional: links to a Project so the lightbox can offer "view project"
+  caption   String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+// Behind-the-scenes (BTS) videos
+model Video {
+  id          String   @id @default(cuid())
+  title       String
+  url         String   // Vimeo or YouTube URL (e.g. https://vimeo.com/123, https://youtu.be/abc)
+  thumbnail   String?  // optional poster image URL
+  description String?
+  category    String   @default("bts") // "bts" for behind-the-scenes
+  published   Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
 }

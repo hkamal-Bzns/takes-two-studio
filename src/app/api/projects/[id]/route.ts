@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const { id } = await ctx.params;
   const body = await req.json();
   const data: Record<string, unknown> = {};
-  for (const k of ["title", "category", "coverImage", "description", "order", "published"]) {
+  for (const k of ["title", "category", "coverImage", "description", "order", "published", "featured", "overview"]) {
     if (k in body) data[k] = body[k];
   }
   const project = await db.project.update({ where: { id }, data });
