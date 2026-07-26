@@ -148,7 +148,6 @@ function Login({ onLogin }: { onLogin: () => void }) {
             {loading ? "…" : "Enter"}
           </button>
         </form>
-        <p className="text-white/30 text-[10px] mt-8 text-center">Default password: takes-two-admin-2024</p>
       </div>
     </Shell>
   );

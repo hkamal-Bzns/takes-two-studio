@@ -1,12 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkAdmin, unauthorized } from "@/lib/auth";
 
 /**
- * GET /api/setup — one-time database setup (browser-friendly, no SSH needed)
- * Visit https://yourdomain.com/api/setup in your browser to create + seed the DB.
- * Safe to run multiple times (idempotent).
+ * GET /api/setup — admin. One-time database setup (browser-friendly, no SSH
+ * needed). Log into /admin first, then visit /api/setup in the same browser to
+ * create + seed the DB. Safe to run multiple times (idempotent).
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!checkAdmin(req)) return unauthorized();
+
   const log: string[] = [];
   try {
     log.push("=== Takes Two Studio — Database Setup ===");

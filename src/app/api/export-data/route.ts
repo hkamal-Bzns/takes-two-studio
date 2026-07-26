@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkAdmin, unauthorized } from "@/lib/auth";
 
 /**
- * GET /api/export-data — exports ALL projects (with images), overview items,
- * and clients as JSON. Used to migrate data to the live server.
+ * GET /api/export-data — admin. Exports ALL projects (with images), overview
+ * items, and clients as JSON. Used to migrate data to the live server.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!checkAdmin(req)) return unauthorized();
+
   const projects = await db.project.findMany({
     orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     include: { images: { orderBy: { order: "asc" } } },

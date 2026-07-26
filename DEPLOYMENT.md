@@ -71,8 +71,17 @@ In the "Environment Variables" section, add:
 | Variable | Value |
 |----------|-------|
 | `DATABASE_URL` | `file:/home/YOUR_HOME_PATH/domains/takestwostudio.com/db/custom.db` |
-| `ADMIN_TOKEN` | `choose-a-strong-password-here` |
+| `ADMIN_PASSWORD` | a long random passphrase, at least 8 characters |
+| `SESSION_SECRET` | output of `openssl rand -hex 32` |
 | `NODE_ENV` | `production` |
+
+> **Both `ADMIN_PASSWORD` and `SESSION_SECRET` are required.** There is no
+> fallback value — if either is missing, or shorter than 8 characters, every
+> login attempt fails with a 500 rather than letting you in with a default.
+>
+> `SESSION_SECRET` signs the admin session cookie; it is not something you ever
+> type. Changing it logs out every existing admin session, which is how you
+> revoke access without changing the password.
 
 > **Finding your home path:** hPanel → "Advanced" → "Terminal" → type `echo $HOME` → use that path. Example: `/home/u123456789/domains/takestwostudio.com/db/custom.db`
 
@@ -131,7 +140,7 @@ Your domain `takestwostudio.com` should auto-connect to the app. If not:
 ## Step 5: Test Your Live Site
 
 1. Visit `https://takestwostudio.com` — you should see your site
-2. Visit `https://takestwostudio.com/admin` — log in with your `ADMIN_TOKEN` password
+2. Visit `https://takestwostudio.com/admin` — log in with your `ADMIN_PASSWORD`
 3. Check that images load (your `public/shoots/` images are included in the repo)
 
 ---
@@ -173,8 +182,15 @@ sqlite3 /path/to/server/custom.db < projects.sql
 - If not, upload via hPanel → File Manager → `public/shoots/`
 
 ### Admin panel won't let me log in
-- Check that `ADMIN_TOKEN` is set correctly in Environment Variables
-- The password is whatever you set as `ADMIN_TOKEN`
+- The password is whatever you set as `ADMIN_PASSWORD`
+- A **500 "Server misconfigured"** means `ADMIN_PASSWORD` or `SESSION_SECRET` is
+  missing from Environment Variables, or is under 8 characters. Check the app
+  logs for `[auth] server is misconfigured`. It is not a wrong-password error.
+- A **401 "Invalid password"** means the variables are fine and the password is
+  genuinely wrong.
+- A **429 "Too many attempts"** means 8 failed logins from your IP inside 15
+  minutes. Wait it out, or restart the app to clear the counter.
+- Remember to restart the app after changing any environment variable.
 
 ### Database resets on every deploy
 - This happens if `DATABASE_URL` points to a path inside the app folder (which gets overwritten on deploy)
@@ -188,7 +204,7 @@ sqlite3 /path/to/server/custom.db < projects.sql
 | What | Where |
 |------|-------|
 | Admin panel | `https://takestwostudio.com/admin` |
-| Admin password | The value of `ADMIN_TOKEN` env var |
+| Admin password | The value of `ADMIN_PASSWORD` env var |
 | App logs | hPanel → Deploy Web App → Logs |
 | File manager | hPanel → File Manager |
 | Terminal | hPanel → Advanced → Terminal |
