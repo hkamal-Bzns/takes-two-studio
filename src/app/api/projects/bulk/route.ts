@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Project } from "@prisma/client";
 import { db } from "@/lib/db";
 import { checkAdmin } from "@/lib/auth";
 
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "items array is required" }, { status: 400 });
   }
 
-  const created = [];
+  const created: Project[] = [];
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     if (!it.title || !it.category || !it.url) continue;
