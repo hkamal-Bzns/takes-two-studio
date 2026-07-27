@@ -187,7 +187,11 @@
     .hero-slide.active { opacity:1; pointer-events:auto; cursor:pointer; }
     .hero-slide img { width:108%; height:100%; object-fit:cover; max-width:none; transform:translateX(-2%); image-rendering:auto; -webkit-font-smoothing:antialiased; backface-visibility:hidden; }
     .hero-slide picture { display: block; width: 100%; height: 100%; }
-    .gallery-item picture, .masonry-item picture { display: block; width: 100%; }
+    /* height:100% matters as much as width: .masonry-item.gallery-item is an
+       aspect-ratio 4/3 box and its img fills it with height:100%. Without a
+       definite height on the wrapper that resolves to auto, the image reverts
+       to its intrinsic ratio and object-fit:cover stops cropping. */
+    .gallery-item picture, .masonry-item picture { display: block; width: 100%; height: 100%; }
     /* gentle horizontal drift alternating direction, gives a continuous video-like pan */
     .hero-slide.active img { animation: panDrift 6s linear forwards; }
     .hero-slide.active:nth-child(odd) img { animation-name: panDriftL; }
