@@ -5,6 +5,10 @@ node_modules/
 .next/
 out/
 
+# TypeScript incremental build cache (regenerates on every tsc run)
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
 # Database (will be created on the server — do NOT commit your local DB)
 db/custom.db
 db/custom.db-journal

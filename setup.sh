@@ -91,7 +91,8 @@ async function main() {
   console.log('');
   console.log('=== Setup complete! ===');
   console.log('Your site is ready. Visit your domain to see it.');
-  console.log('Admin panel: https://yourdomain.com/admin (password = your ADMIN_TOKEN)');
+  console.log('Admin panel: https://yourdomain.com/admin (password = your ADMIN_PASSWORD env var)');
+  console.log('ADMIN_PASSWORD and SESSION_SECRET must both be set, or login returns 500.');
 }
 main().catch(e => { console.error(e); process.exit(1); }).finally(() => db.\$disconnect());
 "

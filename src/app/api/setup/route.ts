@@ -107,6 +107,12 @@ export async function GET(req: NextRequest) {
     log.push("ERROR: " + (error instanceof Error ? error.message : String(error)));
     return NextResponse.json({ success: false, log }, { status: 500 });
   } finally {
+    // KNOWN BUG — do not copy this pattern. `db` is the shared singleton from
+    // @/lib/db, so disconnecting here tears down the connection for every other
+    // route in the process, not just this one. Prisma reconnects lazily so it
+    // usually goes unnoticed, but it can surface as a request failing right
+    // after setup runs. The fix is to drop this finally block entirely; left
+    // in place deliberately to be handled on its own branch.
     await db.$disconnect();
   }
 }
