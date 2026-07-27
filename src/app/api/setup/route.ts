@@ -19,9 +19,14 @@ export async function GET(req: NextRequest) {
     const statements = [
       `CREATE TABLE IF NOT EXISTS "User" ("id" TEXT PRIMARY KEY NOT NULL, "email" TEXT NOT NULL, "name" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email")`,
-      `CREATE TABLE IF NOT EXISTS "Project" ("id" TEXT PRIMARY KEY NOT NULL, "title" TEXT NOT NULL, "category" TEXT NOT NULL, "coverImage" TEXT NOT NULL, "description" TEXT, "order" INTEGER NOT NULL DEFAULT 0, "published" BOOLEAN NOT NULL DEFAULT true, "featured" BOOLEAN NOT NULL DEFAULT false, "overview" BOOLEAN NOT NULL DEFAULT false, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL)`,
+      // NOTE: the derivative columns below must stay in sync with
+      // prisma/schema.prisma. This DDL is what creates a FRESH database, so a
+      // column missing here means Prisma's SELECT fails on a new install.
+      // Existing databases are unaffected (IF NOT EXISTS) and pick the columns
+      // up from prisma/migrations instead.
+      `CREATE TABLE IF NOT EXISTS "Project" ("id" TEXT PRIMARY KEY NOT NULL, "title" TEXT NOT NULL, "category" TEXT NOT NULL, "coverImage" TEXT NOT NULL, "description" TEXT, "order" INTEGER NOT NULL DEFAULT 0, "published" BOOLEAN NOT NULL DEFAULT true, "featured" BOOLEAN NOT NULL DEFAULT false, "overview" BOOLEAN NOT NULL DEFAULT false, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL, "srcsetAvif" TEXT, "srcsetWebp" TEXT, "width" INTEGER, "height" INTEGER)`,
       `CREATE INDEX IF NOT EXISTS "Project_category_idx" ON "Project"("category")`,
-      `CREATE TABLE IF NOT EXISTS "ProjectImage" ("id" TEXT PRIMARY KEY NOT NULL, "projectId" TEXT NOT NULL, "url" TEXT NOT NULL, "caption" TEXT, "order" INTEGER NOT NULL DEFAULT 0, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE)`,
+      `CREATE TABLE IF NOT EXISTS "ProjectImage" ("id" TEXT PRIMARY KEY NOT NULL, "projectId" TEXT NOT NULL, "url" TEXT NOT NULL, "caption" TEXT, "order" INTEGER NOT NULL DEFAULT 0, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "srcsetAvif" TEXT, "srcsetWebp" TEXT, "width" INTEGER, "height" INTEGER, FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE)`,
       `CREATE INDEX IF NOT EXISTS "ProjectImage_projectId_idx" ON "ProjectImage"("projectId")`,
       `CREATE TABLE IF NOT EXISTS "Inquiry" ("id" TEXT PRIMARY KEY NOT NULL, "firstName" TEXT NOT NULL, "lastName" TEXT NOT NULL, "phone" TEXT NOT NULL, "email" TEXT NOT NULL, "message" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'new', "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE INDEX IF NOT EXISTS "Inquiry_status_idx" ON "Inquiry"("status")`,

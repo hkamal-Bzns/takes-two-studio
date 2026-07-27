@@ -11,7 +11,17 @@ import { CSS } from "@dnd-kit/utilities";
    + Inquiry inbox. Single client component.
    ================================================================= */
 
-type Image = { id: string; url: string; caption: string | null; order: number };
+/**
+ * Derivative metadata from the image pipeline. Null on everything uploaded
+ * before it existed — readers fall back to the plain url in that case.
+ */
+type Derivatives = {
+  srcsetAvif?: string | null;
+  srcsetWebp?: string | null;
+  width?: number | null;
+  height?: number | null;
+};
+type Image = { id: string; url: string; caption: string | null; order: number } & Derivatives;
 type Project = {
   id: string;
   title: string;
@@ -24,7 +34,7 @@ type Project = {
   overview: boolean;
   createdAt: string;
   images: Image[];
-};
+} & Derivatives;
 type Inquiry = {
   id: string;
   firstName: string;
@@ -57,6 +67,50 @@ type OverviewItem = {
 };
 
 const API = (p: string) => `/api${p}`;
+
+/**
+ * POST /api/upload used to return { url, filename }. It now returns a manifest
+ * describing the stored master and its AVIF/WebP derivatives.
+ */
+type UploadManifest = {
+  id: string;
+  master: { url: string; width: number; height: number; bytes: number; format: string };
+  srcset: { avif: string; webp: string };
+  fallback: string;
+  aspectRatio: number;
+};
+
+type Uploaded = { url: string } & Required<Derivatives>;
+
+/**
+ * Flatten a manifest into the shape the project/image APIs persist.
+ *
+ * `url` is the widest WebP derivative, not the master — masters are never
+ * served to browsers. Anything that only reads `url` keeps working unchanged,
+ * which is what lets the public site stay untouched for now.
+ */
+function fromManifest(j: UploadManifest): Uploaded {
+  return {
+    url: j?.fallback || j?.master?.url || "",
+    srcsetAvif: j?.srcset?.avif || null,
+    srcsetWebp: j?.srcset?.webp || null,
+    width: j?.master?.width ?? null,
+    height: j?.master?.height ?? null,
+  };
+}
+
+/** Read an upload response, surfacing the API's error message when it failed. */
+async function postUpload(file: File): Promise<Uploaded | null> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const r = await fetch(API("/upload"), { method: "POST", body: fd });
+  if (!r.ok) {
+    const msg = await r.json().then(j => j?.error).catch(() => null);
+    alert(`Upload failed for ${file.name}: ${msg || r.status}`);
+    return null;
+  }
+  return fromManifest(await r.json());
+}
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -480,12 +534,30 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
   const [images, setImages] = useState<Image[]>(project?.images || []);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Derivatives for the current cover. Seeded from the project so an edit that
+  // doesn't touch the cover doesn't wipe them; replaced on upload, and cleared
+  // when the cover path is typed in by hand.
+  const [coverDerivatives, setCoverDerivatives] = useState<Required<Derivatives> | null>(
+    project?.srcsetAvif
+      ? {
+          srcsetAvif: project.srcsetAvif,
+          srcsetWebp: project.srcsetWebp ?? null,
+          width: project.width ?? null,
+          height: project.height ?? null,
+        }
+      : null
+  );
 
   const pid = project?.id;
 
   async function saveProject(): Promise<string | null> {
     setSaving(true);
-    const body = { title, category, coverImage, description, order, published, featured, overview };
+    // coverDerivatives is set when the cover came from the pipeline. Sending
+    // explicit nulls otherwise clears stale srcsets from a previous cover.
+    const body = {
+      title, category, coverImage, description, order, published, featured, overview,
+      ...(coverDerivatives ?? { srcsetAvif: null, srcsetWebp: null, width: null, height: null }),
+    };
     const url = pid ? API(`/projects/${pid}`) : API("/projects");
     const method = pid ? "PATCH" : "POST";
     const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -498,22 +570,24 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
   async function uploadFiles(files: FileList, asCover: boolean) {
     if (!pid && !asCover) { alert("Save the project first before adding gallery images."); return; }
     setUploading(true);
-    const urls: string[] = [];
+    const uploaded: Uploaded[] = [];
     for (const file of Array.from(files)) {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await fetch(API("/upload"), { method: "POST", body: fd });
-      if (r.ok) { const j = await r.json(); urls.push(j.url); }
+      const u = await postUpload(file);
+      if (u) uploaded.push(u);
     }
     setUploading(false);
 
-    if (asCover && urls[0]) setCoverImage(urls[0]);
+    if (asCover && uploaded[0]) {
+      const { url, ...derivatives } = uploaded[0];
+      setCoverImage(url);
+      setCoverDerivatives(derivatives);
+    }
 
-    if (!asCover && pid && urls.length) {
-      // add as gallery images
-      for (const u of urls) {
+    if (!asCover && pid && uploaded.length) {
+      // add as gallery images, carrying each manifest's derivatives
+      for (const u of uploaded) {
         await fetch(API(`/projects/${pid}/images`), {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: u })
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(u)
         });
       }
       // refresh images
@@ -600,7 +674,9 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
             <div className="flex gap-3 items-start">
               {coverImage && <img src={coverImage} alt="cover" className="w-24 h-24 object-cover bg-white/5" />}
               <div className="flex-1">
-                <input value={coverImage} onChange={e => setCoverImage(e.target.value)} placeholder="/shoots/x.jpg or upload" className="adm-field mb-2" />
+                {/* Typing a path by hand points at an image with no manifest,
+                    so any derivatives from a previous cover must be dropped. */}
+                <input value={coverImage} onChange={e => { setCoverImage(e.target.value); setCoverDerivatives(null); }} placeholder="/shoots/x.jpg or upload" className="adm-field mb-2" />
                 <input type="file" accept="image/*" onChange={e => e.target.files && uploadFiles(e.target.files, true)} disabled={uploading} className="text-[10px] text-white/50" />
               </div>
             </div>
@@ -682,7 +758,7 @@ function SortableImage({ img, onRemove }: { img: Image; onRemove: (id: string) =
 }
 
 /* ---------------- Bulk Import ---------------- */
-type BulkRow = { id: string; url: string; title: string; category: string };
+type BulkRow = { id: string; url: string; title: string; category: string } & Required<Derivatives>;
 
 function BulkImport({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [rows, setRows] = useState<BulkRow[]>([]);
@@ -696,14 +772,11 @@ function BulkImport({ onClose, onDone }: { onClose: () => void; onDone: () => vo
     setUploading(true);
     const newRows: BulkRow[] = [];
     for (const file of Array.from(files)) {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await fetch(API("/upload"), { method: "POST", body: fd });
-      if (r.ok) {
-        const j = await r.json();
+      const u = await postUpload(file);
+      if (u) {
         // default title = filename without extension, cleaned up
         const title = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
-        newRows.push({ id: uid(), url: j.url, title, category: defaultCat });
+        newRows.push({ id: uid(), title, category: defaultCat, ...u });
       }
     }
     setUploading(false);
@@ -728,7 +801,17 @@ function BulkImport({ onClose, onDone }: { onClose: () => void; onDone: () => vo
     const r = await fetch(API("/projects/bulk"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: valid.map(r => ({ title: r.title.trim(), category: r.category, url: r.url })) }),
+      body: JSON.stringify({
+        items: valid.map(r => ({
+          title: r.title.trim(),
+          category: r.category,
+          url: r.url,
+          srcsetAvif: r.srcsetAvif,
+          srcsetWebp: r.srcsetWebp,
+          width: r.width,
+          height: r.height,
+        })),
+      }),
     });
     setCreating(false);
     if (r.ok) {
@@ -1007,14 +1090,11 @@ function SiteTab() {
 
   async function uploadLogo(file: File) {
     setUploadingLogo(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    const r = await fetch(API("/upload"), { method: "POST", body: fd });
+    const u = await postUpload(file);
     setUploadingLogo(false);
-    if (r.ok) {
-      const j = await r.json();
-      set("logo", j.url);
-    }
+    // SiteSetting stores a bare string, so only the fallback url is kept. The
+    // derivatives still exist on disk if the logo ever moves to <picture>.
+    if (u) set("logo", u.url);
   }
 
   async function save() {
@@ -1228,15 +1308,13 @@ function ClientsTab() {
   }
 
   async function uploadLogo(id: string, file: File) {
-    const fd = new FormData();
-    fd.append("file", file);
-    const r = await fetch(API("/upload"), { method: "POST", body: fd });
-    if (r.ok) {
-      const j = await r.json();
+    const u = await postUpload(file);
+    if (u) {
+      // Client.logo is a bare string too — fallback url only.
       await fetch(API(`/clients/${id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logo: j.url }),
+        body: JSON.stringify({ logo: u.url }),
       });
       refreshRef.current();
     }

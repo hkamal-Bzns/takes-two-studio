@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAdmin } from "@/lib/auth";
+import { pickDerivatives } from "@/lib/images";
 
 /**
  * GET /api/projects?category=advertising
  *   Public — returns published projects (with images) for the gallery.
+ *   Projects and their images carry srcsetAvif / srcsetWebp / width / height,
+ *   which are null for anything uploaded before the image pipeline existed.
+ *   Consumers must fall back to `coverImage` / `url` when srcsetAvif is null.
  * POST /api/projects
- *   Admin — creates a project. Body: { title, category, coverImage, description?, order? }
+ *   Admin — creates a project.
+ *   Body: { title, category, coverImage, description?, order?,
+ *           srcsetAvif?, srcsetWebp?, width?, height? }
  */
 export async function GET(req: NextRequest) {
   const category = req.nextUrl.searchParams.get("category");
@@ -54,6 +60,9 @@ export async function POST(req: NextRequest) {
       order: typeof order === "number" ? order : 0,
       featured: typeof featured === "boolean" ? featured : false,
       overview: typeof overview === "boolean" ? overview : false,
+      // Derivatives for coverImage, when the caller uploaded through the
+      // pipeline. All null when it didn't — coverImage still renders.
+      ...pickDerivatives(body),
     },
   });
   return NextResponse.json({ project }, { status: 201 });

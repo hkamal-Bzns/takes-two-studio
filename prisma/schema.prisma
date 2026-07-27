@@ -32,17 +32,32 @@ model Project {
   updatedAt   DateTime @updatedAt
   images      ProjectImage[]
 
+  // Derivatives for `coverImage`, produced by the upload pipeline.
+  // All nullable: rows predating the pipeline keep working and the front end
+  // falls back to plain `coverImage` whenever srcsetAvif is null.
+  srcsetAvif  String?  // "url 640w, url 1024w, ..." for <source type="image/avif">
+  srcsetWebp  String?  // same, for <source type="image/webp">
+  width       Int?     // master pixel width, for aspect-ratio boxes
+  height      Int?     // master pixel height
+
   @@index([category])
 }
 
 model ProjectImage {
-  id        String   @id @default(cuid())
-  projectId String
-  url       String
-  caption   String?
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  projectId  String
+  url        String
+  caption    String?
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Derivatives for `url`. Nullable for the same reason as on Project —
+  // the 324 existing images have none until their masters are re-uploaded.
+  srcsetAvif String?
+  srcsetWebp String?
+  width      Int?
+  height     Int?
 
   @@index([projectId])
 }

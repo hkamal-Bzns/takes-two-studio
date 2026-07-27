@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAdmin } from "@/lib/auth";
+import { pickDerivatives } from "@/lib/images";
 
 /**
  * GET /api/projects/[id]            — public, single project + images
@@ -24,6 +25,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const data: Record<string, unknown> = {};
   for (const k of ["title", "category", "coverImage", "description", "order", "published", "featured", "overview"]) {
     if (k in body) data[k] = body[k];
+  }
+  // Derivatives travel with coverImage: if the cover is being replaced, the
+  // srcsets for the old cover must not survive it. Explicit nulls are honoured
+  // so re-uploading a non-pipeline image clears stale derivative data.
+  if ("coverImage" in body || "srcsetAvif" in body) {
+    Object.assign(data, pickDerivatives(body));
   }
   const project = await db.project.update({ where: { id }, data });
   return NextResponse.json({ project });
