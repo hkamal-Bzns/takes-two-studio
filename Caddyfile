@@ -6,8 +6,17 @@
 	handle @transform_port_query {
 		reverse_proxy localhost:{query.XTransformPort} {
 			header_up Host {host}
+			# Drop whatever the client sent before setting our own value.
+			# Caddy APPENDS the real peer address to an inbound
+			# X-Forwarded-For, and the app reads the first entry
+			# (src/app/api/auth/login/route.ts, clientIp), so a request
+			# carrying "X-Forwarded-For: 1.2.3.4" would otherwise bucket the
+			# login rate limiter under an attacker-chosen address. Deleting
+			# first makes the result independent of directive ordering.
+			header_up -X-Forwarded-For
 			header_up X-Forwarded-For {remote_host}
 			header_up X-Forwarded-Proto {scheme}
+			header_up -X-Real-IP
 			header_up X-Real-IP {remote_host}
 		}
 	}
@@ -15,8 +24,12 @@
 	handle {
 		reverse_proxy localhost:3000 {
 			header_up Host {host}
+			# See the note above: strip the inbound value, then set it, so a
+			# spoofed X-Forwarded-For cannot survive to the application.
+			header_up -X-Forwarded-For
 			header_up X-Forwarded-For {remote_host}
 			header_up X-Forwarded-Proto {scheme}
+			header_up -X-Real-IP
 			header_up X-Real-IP {remote_host}
 		}
 	}
