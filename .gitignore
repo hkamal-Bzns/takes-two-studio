@@ -45,4 +45,8 @@ overview-*.png
 issue-*.png
 rebrand-*.png
 two-*.png
-upload/
+
+# Scaffold leftover at the repo root. The leading slash matters: unanchored,
+# this pattern also matched src/app/api/upload/ and silently ignored the upload
+# API route.
+/upload/
