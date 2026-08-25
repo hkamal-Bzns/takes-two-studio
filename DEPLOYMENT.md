@@ -60,7 +60,7 @@ Set these settings:
 | Setting | Value |
 |---------|-------|
 | **App name** | `takes-two-studio` |
-| **Node.js version** | `20.x` (or the latest available) |
+| **Node.js version** | `24.x` (what the server currently runs) |
 | **Build command** | `npm run build` |
 | **Start command** | `npm run start` |
 | **Port** | `3000` (Hostinger usually auto-detects) |
