@@ -23,6 +23,13 @@ server.log
 .env.local
 .env.production
 
+# Backups of the above. A copy of .env.local carries ADMIN_PASSWORD and
+# SESSION_SECRET just as the original does, and the patterns above don't
+# match a suffixed filename.
+*.bak
+.env*.bak
+db/*.db.bak-*
+
 # OS files
 .DS_Store
 Thumbs.db

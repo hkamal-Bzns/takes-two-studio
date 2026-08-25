@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!checkAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json();
-  const { title, category, coverImage, description, order, featured, overview } = body;
+  const { title, category, coverImage, description, order, published, featured, overview } = body;
   if (!title || !category || !coverImage) {
     return NextResponse.json({ error: "title, category, coverImage are required" }, { status: 400 });
   }
@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
       coverImage,
       description: description ?? null,
       order: typeof order === "number" ? order : 0,
+      // `published` was previously dropped here, so unticking Published on a
+      // new project silently fell through to the schema default of true.
+      published: typeof published === "boolean" ? published : true,
       featured: typeof featured === "boolean" ? featured : false,
       overview: typeof overview === "boolean" ? overview : false,
       // Derivatives for coverImage, when the caller uploaded through the

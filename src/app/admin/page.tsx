@@ -112,6 +112,55 @@ async function postUpload(file: File): Promise<Uploaded | null> {
   return fromManifest(await r.json());
 }
 
+/**
+ * Attach an already-uploaded manifest to a project row.
+ *
+ * `order` is passed explicitly: the route defaults it to 0, so omitting it —
+ * as this call used to — left every gallery image tied on 0 and the on-screen
+ * order down to whatever SQLite returned.
+ *
+ * Returns false rather than throwing so callers can report which images
+ * failed and keep the rest.
+ */
+async function attachImage(projectId: string, u: Uploaded, order: number): Promise<boolean> {
+  const r = await fetch(API(`/projects/${projectId}/images`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...u, order }),
+  });
+  return r.ok;
+}
+
+/**
+ * Gallery images picked before the project exists are uploaded straight away
+ * — /api/upload needs no project id — and held client-side until Create
+ * produces a row to attach them to. They wear a prefixed temporary id so the
+ * grid, drag-to-reorder and remove all work on them unchanged, and so nothing
+ * ever sends one of these ids to the server.
+ */
+const STAGED_PREFIX = "staged:";
+const isStaged = (id: string) => id.startsWith(STAGED_PREFIX);
+
+function toStaged(u: Uploaded): Image {
+  return {
+    id: `${STAGED_PREFIX}${Math.random().toString(36).slice(2, 10)}`,
+    caption: null,
+    order: 0,
+    ...u,
+  };
+}
+
+/** Widen a staged row back to the manifest shape the images API persists. */
+function toManifest(img: Image): Uploaded {
+  return {
+    url: img.url,
+    srcsetAvif: img.srcsetAvif ?? null,
+    srcsetWebp: img.srcsetWebp ?? null,
+    width: img.width ?? null,
+    height: img.height ?? null,
+  };
+}
+
 export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [tab, setTab] = useState<"projects" | "overview" | "inquiries" | "settings" | "clients" | "site">("projects");
@@ -532,7 +581,12 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
   const [featured, setFeatured] = useState(project?.featured ?? false);
   const [overview, setOverview] = useState(project?.overview ?? false);
   const [images, setImages] = useState<Image[]>(project?.images || []);
+  // Uploaded but not yet attached — see STAGED_PREFIX. Normally empty when
+  // editing an existing project; also holds the survivors when an attach
+  // fails partway through a create.
+  const [staged, setStaged] = useState<Image[]>([]);
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   // Derivatives for the current cover. Seeded from the project so an edit that
   // doesn't touch the cover doesn't wipe them; replaced on upload, and cleared
@@ -548,10 +602,16 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
       : null
   );
 
-  const pid = project?.id;
+  // Held in state, not read straight off the prop: once a create succeeds this
+  // has to flip to the new id so a retry after a partial failure updates that
+  // project instead of creating a second one.
+  const [savedId, setSavedId] = useState<string | null>(project?.id ?? null);
+  const pid = savedId;
+
+  // Saved rows first, then anything still waiting to attach.
+  const gallery = [...images, ...staged];
 
   async function saveProject(): Promise<string | null> {
-    setSaving(true);
     // coverDerivatives is set when the cover came from the pipeline. Sending
     // explicit nulls otherwise clears stale srcsets from a previous cover.
     const body = {
@@ -561,14 +621,16 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
     const url = pid ? API(`/projects/${pid}`) : API("/projects");
     const method = pid ? "PATCH" : "POST";
     const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    setSaving(false);
-    if (!r.ok) { alert("Save failed"); return null; }
+    if (!r.ok) {
+      const msg = await r.json().then(j => j?.error).catch(() => null);
+      alert(`Save failed${msg ? `: ${msg}` : ""}`);
+      return null;
+    }
     const j = await r.json();
     return j.project.id;
   }
 
   async function uploadFiles(files: FileList, asCover: boolean) {
-    if (!pid && !asCover) { alert("Save the project first before adding gallery images."); return; }
     setUploading(true);
     const uploaded: Uploaded[] = [];
     for (const file of Array.from(files)) {
@@ -577,27 +639,41 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
     }
     setUploading(false);
 
-    if (asCover && uploaded[0]) {
-      const { url, ...derivatives } = uploaded[0];
-      setCoverImage(url);
-      setCoverDerivatives(derivatives);
+    if (asCover) {
+      if (uploaded[0]) {
+        const { url, ...derivatives } = uploaded[0];
+        setCoverImage(url);
+        setCoverDerivatives(derivatives);
+      }
+      return;
+    }
+    if (!uploaded.length) return;
+
+    // With a row in hand the manifests attach immediately; without one they
+    // wait in `staged` until Create produces an id.
+    if (!pid) {
+      setStaged(s => [...s, ...uploaded.map(toStaged)]);
+      return;
     }
 
-    if (!asCover && pid && uploaded.length) {
-      // add as gallery images, carrying each manifest's derivatives
-      for (const u of uploaded) {
-        await fetch(API(`/projects/${pid}/images`), {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(u)
-        });
-      }
-      // refresh images
-      const r = await fetch(API(`/projects/${pid}`));
-      const j = await r.json();
-      setImages(j.project?.images || []);
+    const failed: Uploaded[] = [];
+    for (const [i, u] of uploaded.entries()) {
+      if (!(await attachImage(pid, u, images.length + i))) failed.push(u);
     }
+    // Previously the attach response went unchecked, so a failure here looked
+    // exactly like success until the refresh came back short.
+    if (failed.length) {
+      alert(`${failed.length} of ${uploaded.length} image(s) could not be added to the project.`);
+    }
+    const r = await fetch(API(`/projects/${pid}`));
+    const j = await r.json();
+    setImages(j.project?.images || []);
   }
 
   async function removeImage(imgId: string) {
+    // Staged images have no row to delete — dropping them from the list is
+    // the whole operation. Their uploaded files stay in MEDIA_ROOT (follow-up).
+    if (isStaged(imgId)) { setStaged(s => s.filter(i => i.id !== imgId)); return; }
     if (!pid) return;
     await fetch(API(`/projects/${pid}/images/${imgId}`), { method: "DELETE" });
     setImages(images.filter(i => i.id !== imgId));
@@ -611,24 +687,64 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIndex = images.findIndex(i => i.id === active.id);
-    const newIndex = images.findIndex(i => i.id === over.id);
+    const oldIndex = gallery.findIndex(i => i.id === active.id);
+    const newIndex = gallery.findIndex(i => i.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
-    const newImages = arrayMove(images, oldIndex, newIndex);
-    setImages(newImages);
-    // persist new order to backend
-    if (pid) {
+    const next = arrayMove(gallery, oldIndex, newIndex);
+    // Split the reordered list back into rows and pending uploads. Each keeps
+    // its new relative order; staged ones get theirs applied when they attach.
+    const savedNext = next.filter(i => !isStaged(i.id));
+    setImages(savedNext);
+    setStaged(next.filter(i => isStaged(i.id)));
+    // persist new order to backend — only rows have ids the server knows
+    if (pid && savedNext.length) {
       await fetch(API(`/projects/${pid}/images/reorder`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: newImages.map(i => i.id) }),
+        body: JSON.stringify({ order: savedNext.map(i => i.id) }),
       });
     }
   }
 
   async function handleSave() {
+    // The create route rejects a missing title/category/coverImage with a 400.
+    // Checking here keeps a dozen staged images from being met with a bare
+    // "Save failed", which reads like the uploads were thrown away.
+    const missing = !title.trim() ? "a title"
+      : !category ? "a category"
+      : !coverImage.trim() ? "a cover image"
+      : null;
+    if (missing) { alert(`Add ${missing} before saving.`); return; }
+
+    setSaving(true);
     const id = await saveProject();
-    if (id) { alert("Saved"); onClose(); }
+    if (!id) { setSaving(false); return; }
+    setSavedId(id);
+
+    if (staged.length) {
+      const failed: Image[] = [];
+      for (const [i, img] of staged.entries()) {
+        setProgress(`Adding image ${i + 1} of ${staged.length}…`);
+        const ok = await attachImage(id, toManifest(img), images.length + i);
+        if (!ok) failed.push(img);
+      }
+      setProgress(null);
+      setStaged(failed);
+      if (failed.length) {
+        // The project itself exists now, so don't close: the editor is in edit
+        // mode against it and pressing Update retries only what's left.
+        setSaving(false);
+        alert(
+          `Project saved, but ${failed.length} of ${staged.length} gallery image(s) could not be added. ` +
+          `They are still listed — press Update Project to retry them.`
+        );
+        return;
+      }
+    }
+
+    setSaving(false);
+    alert("Saved");
+    onClose();
   }
 
   return (
@@ -682,35 +798,34 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
             </div>
           </Field>
 
-          <button onClick={handleSave} disabled={saving}
+          <button onClick={handleSave} disabled={saving || uploading}
             className="border border-white/30 px-6 py-3 text-[11px] tracking-[0.3em] uppercase hover:bg-white hover:text-black transition-colors disabled:opacity-50">
-            {saving ? "Saving…" : pid ? "Update Project" : "Create Project"}
+            {saving ? (progress ?? "Saving…") : pid ? "Update Project" : "Create Project"}
           </button>
         </div>
 
         {/* Right: gallery images (drag to reorder) */}
         <div>
-          <Field label={`Gallery Images (${images.length})${images.length > 1 ? " — drag to reorder" : ""}`}>
-            {!pid ? (
-              <p className="text-white/40 text-sm">Save the project first, then upload gallery images.</p>
+          <Field label={`Gallery Images (${gallery.length})${gallery.length > 1 ? " — drag to reorder" : ""}`}>
+            <input type="file" accept="image/*" multiple onChange={e => e.target.files && uploadFiles(e.target.files, false)} disabled={uploading} className="text-[10px] text-white/50 mb-4" />
+            {uploading && <p className="text-white/50 text-xs mb-2">Uploading…</p>}
+            {!pid && staged.length > 0 && (
+              <p className="text-white/50 text-xs mb-2">
+                {staged.length} image{staged.length > 1 ? "s" : ""} ready — added when you press Create Project.
+              </p>
+            )}
+            {gallery.length > 0 ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={gallery.map(i => i.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-3 gap-3">
+                    {gallery.map(img => (
+                      <SortableImage key={img.id} img={img} onRemove={removeImage} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             ) : (
-              <>
-                <input type="file" accept="image/*" multiple onChange={e => e.target.files && uploadFiles(e.target.files, false)} disabled={uploading} className="text-[10px] text-white/50 mb-4" />
-                {uploading && <p className="text-white/50 text-xs mb-2">Uploading…</p>}
-                {images.length > 0 ? (
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={images.map(i => i.id)} strategy={rectSortingStrategy}>
-                      <div className="grid grid-cols-3 gap-3">
-                        {images.map(img => (
-                          <SortableImage key={img.id} img={img} onRemove={removeImage} />
-                        ))}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
-                ) : (
-                  <p className="text-white/30 text-sm">No gallery images yet.</p>
-                )}
-              </>
+              <p className="text-white/30 text-sm">No gallery images yet.</p>
             )}
           </Field>
         </div>
