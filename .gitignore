@@ -50,3 +50,17 @@ two-*.png
 # this pattern also matched src/app/api/upload/ and silently ignored the upload
 # API route.
 /upload/
+
+# Working notes, audits and one-off patch drafts kept at the repo root.
+/IMPLEMENTATION.md
+/index-html-patches.md
+/picture-patch.md
+/takes-two-studio-audit.md
+/fix-image-extensions.ts
+
+# Stray artefacts. Both are anchored on purpose: bare `main` would also ignore
+# any file or directory named `main` deeper in the tree, and bare `robots.txt`
+# would hide public/robots.txt if we ever ship one.
+/main
+/mnt/
+/robots.txt
