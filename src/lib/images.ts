@@ -22,8 +22,25 @@ import path from "node:path";
  * saturated high-contrast edges — a red can against a dark background, for example.
  */
 
-/** Widths generated for every image. Widths above the master's own width are skipped. */
-export const DERIVATIVE_WIDTHS = [640, 1024, 1600, 2400, 3200] as const;
+/**
+ * Widths generated for every image. Widths above the master's own width are
+ * skipped, so a 3000px master simply stops at 2400.
+ *
+ * 4500 is the zoom rung. This is a photography portfolio and visitors pixel-peep
+ * in the lightbox, so the top rung matches a typical master's long edge rather
+ * than stopping at a browsing size. Measured on real project files it costs
+ * ~0.72 MB in AVIF — actually less than the 3200 WebP the lightbox used to load.
+ */
+export const DERIVATIVE_WIDTHS = [640, 1024, 1600, 2400, 3200, 4500] as const;
+
+/**
+ * Widths emitted as AVIF only. The zoom rung is fetched by one viewer in a
+ * hundred, and only after they choose to zoom, so paying for a second copy in
+ * WebP doubles the storage and upload for almost nothing. Browsers without AVIF
+ * (~4%, older Safari) fall back to the widest WebP, which is unchanged at 3200 —
+ * exactly the behaviour they had before this rung existed.
+ */
+export const AVIF_ONLY_WIDTHS: ReadonlySet<number> = new Set([4500]);
 
 const AVIF_QUALITY = 60; // AVIF is perceptually stronger; 60 ≈ WebP 84
 const WEBP_QUALITY = 84;
@@ -120,16 +137,20 @@ export async function processUpload(buf: Buffer, originalName: string): Promise<
       .avif({ quality: AVIF_QUALITY, chromaSubsampling: "4:4:4", effort: 4 })
       .toBuffer();
 
+    await writeFile(path.join(derivDir, `${width}.avif`), avifBuf);
+    avif.push({ width, url: `/api/media/derivatives/${id}/${width}.avif`, bytes: avifBuf.length });
+
+    // The zoom rung is AVIF only — see AVIF_ONLY_WIDTHS. Skipping WebP here is
+    // what keeps `fallback` (and so every stored `url`) pointing at 3200.webp.
+    if (AVIF_ONLY_WIDTHS.has(width)) continue;
+
     const webpBuf = await base
       .clone()
       .withIccProfile("srgb")
       .webp({ quality: WEBP_QUALITY, smartSubsample: true })
       .toBuffer();
 
-    await writeFile(path.join(derivDir, `${width}.avif`), avifBuf);
     await writeFile(path.join(derivDir, `${width}.webp`), webpBuf);
-
-    avif.push({ width, url: `/api/media/derivatives/${id}/${width}.avif`, bytes: avifBuf.length });
     webp.push({ width, url: `/api/media/derivatives/${id}/${width}.webp`, bytes: webpBuf.length });
   }
 

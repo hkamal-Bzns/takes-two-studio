@@ -219,11 +219,24 @@
     @keyframes progress { from { width:0; } to { width:100%; } }
 
     /* ---------- Lightbox ---------- */
-    .lightbox { opacity:0; pointer-events:none; transition:opacity .45s var(--ease); }
+    .lightbox { opacity:0; pointer-events:none; transition:opacity .45s var(--ease); overflow:hidden; }
     .lightbox.open { opacity:1; pointer-events:auto; }
     .lightbox img.lb-img { transform:scale(0.96); transition:opacity .4s var(--ease), transform .5s var(--ease); }
     .lightbox.open img.lb-img { transform:scale(1); }
     .lb-fade { transition:opacity .35s var(--ease); }
+
+    /* Zoom. While zoomed the inline transform set in JS wins over the rules
+       above, so the open/close animation and the pan share one property
+       without fighting each other. */
+    .lightbox img.lb-img { cursor:zoom-in; will-change:transform; }
+    .lightbox.zoomed img.lb-img { cursor:grab; transition:opacity .25s var(--ease); }
+    .lightbox.zoomed.panning img.lb-img { cursor:grabbing; transition:none; }
+    .lightbox.zoomed .lb-fade, .lightbox.zoomed #lightbox-counter { opacity:0 !important; pointer-events:none; }
+    .lb-hint { transition:opacity .35s var(--ease); }
+    .lightbox.zoomed .lb-hint { opacity:0; }
+    @media (prefers-reduced-motion: reduce) {
+      .lightbox img.lb-img { transition:opacity .2s linear; }
+    }
 
     /* ---------- Mobile menu ---------- */
     .mobile-menu { max-height:0; overflow:hidden; transition:max-height .5s var(--ease); }
@@ -530,6 +543,8 @@
     </figure>
     <button onclick="nextImage()" aria-label="Next" class="absolute right-3 md:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl md:text-6xl font-light leading-none transition-colors px-2">›</button>
     <div id="lightbox-counter" class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/40 text-[10px] tracking-[0.3em] uppercase"></div>
+    <div id="lightbox-hint" class="lb-hint absolute bottom-6 right-6 text-white/35 text-[10px] tracking-[0.25em] uppercase hidden md:block">Click to zoom</div>
+    <div id="lightbox-loading" class="absolute top-6 left-1/2 -translate-x-1/2 text-white/50 text-[10px] tracking-[0.3em] uppercase opacity-0 transition-opacity">Loading full resolution…</div>
   </div>
 
   <!-- ===================== SCRIPT ===================== -->
@@ -761,6 +776,22 @@
         if (m && Number(m[2]) > bestW) { bestW = Number(m[2]); best = m[1]; }
       });
       return best || fallback || '';
+    }
+
+    /* Parse a srcset into [{url,w}] sorted narrow -> wide. */
+    function parseSrcset(srcset) {
+      if (!srcset) return [];
+      return srcset.split(',').map(p => {
+        const m = p.trim().match(/^(\S+)\s+(\d+)w$/);
+        return m ? { url: m[1], w: Number(m[2]) } : null;
+      }).filter(Boolean).sort((a, b) => a.w - b.w);
+    }
+
+    /* Narrowest entry at least `want` wide, else the widest available. */
+    function pickAtLeast(srcset, want) {
+      const list = parseSrcset(srcset);
+      if (!list.length) return null;
+      return (list.find(e => e.w >= want) || list[list.length - 1]).url;
     }
 
     /* Builds a <picture>. If o.srcsetAvif / o.srcsetWebp are absent it degrades
@@ -1077,9 +1108,94 @@
       updateLightbox();
     }
     function closeLightbox() {
+      resetLbZoom();
       document.getElementById('lightbox').classList.remove('open');
       document.body.style.overflow = '';
     }
+    /* ---------- Lightbox zoom ----------
+       Opening loads a browsing-sized rung so the lightbox stays as fast as it
+       has always been. The 4500px AVIF is fetched only when someone actually
+       zooms, which is the whole point of that rung existing. */
+    let lbZoom = 1, lbTX = 0, lbTY = 0, lbFullLoaded = false, lbDragged = false;
+
+    /* AVIF first — it is both smaller and the only format carrying the 4500px
+       rung. Falls back to WebP, then to the stored url, via onerror. */
+    function lightboxSources(img) {
+      const viewWant = Math.min(3200, Math.round(window.innerWidth * (window.devicePixelRatio || 1)));
+      return {
+        viewAvif: pickAtLeast(img.srcsetAvif, viewWant),
+        viewWebp: pickAtLeast(img.srcsetWebp, viewWant),
+        fullAvif: largestFrom(img.srcsetAvif, ''),
+        fullWebp: largestFrom(img.srcsetWebp, ''),
+        plain: img.url
+      };
+    }
+
+    function applyLbTransform() {
+      const lbImg = document.getElementById('lightbox-img');
+      const box = document.getElementById('lightbox');
+      if (lbZoom === 1) {
+        lbImg.style.transform = '';
+        box.classList.remove('zoomed');
+      } else {
+        lbImg.style.transform = 'translate(' + lbTX + 'px,' + lbTY + 'px) scale(' + lbZoom + ')';
+        box.classList.add('zoomed');
+      }
+    }
+
+    function resetLbZoom() { lbZoom = 1; lbTX = 0; lbTY = 0; lbFullLoaded = false; applyLbTransform(); }
+
+    /* Clamp panning so the image can never be dragged off screen. */
+    function clampPan() {
+      const lbImg = document.getElementById('lightbox-img');
+      const r = lbImg.getBoundingClientRect();
+      const scaledW = lbImg.clientWidth * lbZoom, scaledH = lbImg.clientHeight * lbZoom;
+      const maxX = Math.max(0, (scaledW - window.innerWidth) / 2);
+      const maxY = Math.max(0, (scaledH - window.innerHeight) / 2);
+      lbTX = Math.min(maxX, Math.max(-maxX, lbTX));
+      lbTY = Math.min(maxY, Math.max(-maxY, lbTY));
+    }
+
+    /* Swap in the 4500px AVIF the first time someone zooms. */
+    function loadFullRes() {
+      if (lbFullLoaded) return;
+      lbFullLoaded = true;
+      const img = currentProjectImages[lbIndex];
+      if (!img) return;
+      const s = lightboxSources(img);
+      const target = s.fullAvif || s.fullWebp;
+      const lbImg = document.getElementById('lightbox-img');
+      if (!target || target === lbImg.getAttribute('src')) return;
+      const note = document.getElementById('lightbox-loading');
+      if (note) note.style.opacity = '1';
+      const hi = new Image();
+      hi.onload = () => { lbImg.src = hi.src; if (note) note.style.opacity = '0'; };
+      hi.onerror = () => {
+        if (s.fullWebp && hi.src !== location.origin + s.fullWebp) { hi.src = s.fullWebp; return; }
+        if (note) note.style.opacity = '0';
+      };
+      hi.src = target;
+    }
+
+    function toggleLbZoom(clientX, clientY) {
+      const lbImg = document.getElementById('lightbox-img');
+      if (lbZoom !== 1) { resetLbZoom(); return; }
+      // scale that brings the displayed image to its natural pixel size (1:1),
+      // capped so a huge master cannot blow up beyond 4x
+      const natural = lbImg.naturalWidth || lbImg.clientWidth;
+      const target = Math.min(4, Math.max(1.6, natural / Math.max(1, lbImg.clientWidth)));
+      const r = lbImg.getBoundingClientRect();
+      const cx = (clientX == null ? r.left + r.width / 2 : clientX);
+      const cy = (clientY == null ? r.top + r.height / 2 : clientY);
+      // keep the clicked point under the cursor
+      lbTX = (r.left + r.width / 2 - cx) * (target - 1);
+      lbTY = (r.top + r.height / 2 - cy) * (target - 1);
+      lbZoom = target;
+      clampPan();
+      applyLbTransform();
+      loadFullRes();
+    }
+
     function updateLightbox() {
       if (currentProjectImages.length === 0) return;
       lbIndex = (lbIndex + currentProjectImages.length) % currentProjectImages.length;
@@ -1088,9 +1204,13 @@
       const caption = document.getElementById('lightbox-caption');
       const counter = document.getElementById('lightbox-counter');
       const projLink = document.getElementById('lightbox-project-link');
+      resetLbZoom();
       lbImg.style.opacity = '0'; caption.style.opacity = '0';
       if (projLink) projLink.style.opacity = '0';
-      const fullSrc = largestFrom(img.srcsetWebp, img.url);
+
+      const s = lightboxSources(img);
+      const chain = [s.viewAvif, s.viewWebp, s.plain].filter(Boolean);
+      let attempt = 0;
       const tmp = new Image();
       tmp.onload = () => {
         lbImg.src = tmp.src;
@@ -1104,23 +1224,82 @@
           else { projLink.classList.add('hidden'); }
         }
       };
-      tmp.onerror = () => { lbImg.src = img.url; lbImg.style.opacity = '1'; };
-      tmp.src = fullSrc;
+      tmp.onerror = () => {
+        attempt++;
+        if (attempt < chain.length) { tmp.src = chain[attempt]; return; }
+        lbImg.src = img.url; lbImg.style.opacity = '1';
+      };
+      tmp.src = chain[0];
       counter.textContent = String(lbIndex+1).padStart(2,'0') + ' / ' + String(currentProjectImages.length).padStart(2,'0');
     }
-    function nextImage(){ lbIndex++; updateLightbox(); }
-    function prevImage(){ lbIndex--; updateLightbox(); }
+    function nextImage(){ resetLbZoom(); lbIndex++; updateLightbox(); }
+    function prevImage(){ resetLbZoom(); lbIndex--; updateLightbox(); }
+
+    /* ---------- Zoom interactions ---------- */
+    (function setupLightboxZoom() {
+      const box = document.getElementById('lightbox');
+      const lbImg = document.getElementById('lightbox-img');
+      if (!box || !lbImg) return;
+
+      lbImg.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (lbDragged) { lbDragged = false; return; }
+        toggleLbZoom(e.clientX, e.clientY);
+      });
+
+      box.addEventListener('wheel', (e) => {
+        if (!box.classList.contains('open')) return;
+        e.preventDefault();
+        if (lbZoom === 1 && e.deltaY < 0) { toggleLbZoom(e.clientX, e.clientY); return; }
+        if (lbZoom === 1) return;
+        lbZoom = Math.min(4, Math.max(1, lbZoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+        if (lbZoom === 1) { resetLbZoom(); return; }
+        clampPan(); applyLbTransform();
+      }, { passive: false });
+
+      let sx = 0, sy = 0, ox = 0, oy = 0, dragging = false;
+      const start = (x, y) => { dragging = true; lbDragged = false; sx = x; sy = y; ox = lbTX; oy = lbTY; box.classList.add('panning'); };
+      const move = (x, y) => {
+        if (!dragging || lbZoom === 1) return;
+        if (Math.abs(x - sx) > 3 || Math.abs(y - sy) > 3) lbDragged = true;
+        lbTX = ox + (x - sx); lbTY = oy + (y - sy);
+        clampPan(); applyLbTransform();
+      };
+      const end = () => { dragging = false; box.classList.remove('panning'); };
+
+      lbImg.addEventListener('pointerdown', (e) => { if (lbZoom === 1) return; e.preventDefault(); lbImg.setPointerCapture(e.pointerId); start(e.clientX, e.clientY); });
+      lbImg.addEventListener('pointermove', (e) => move(e.clientX, e.clientY));
+      lbImg.addEventListener('pointerup', end);
+      lbImg.addEventListener('pointercancel', end);
+
+      // double-tap to zoom on touch
+      let lastTap = 0;
+      lbImg.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTap < 300 && e.changedTouches.length === 1) {
+          const t = e.changedTouches[0];
+          toggleLbZoom(t.clientX, t.clientY);
+          e.preventDefault();
+        }
+        lastTap = now;
+      }, { passive: false });
+    })();
 
     document.addEventListener('keydown', (e) => {
       const lb = document.getElementById('lightbox');
       if (!lb.classList.contains('open')) return;
-      if (e.key === 'Escape') closeLightbox();
+      // Escape backs out of zoom first, so it never closes the lightbox on
+      // someone who was only trying to stop inspecting an image.
+      if (e.key === 'Escape') { if (lbZoom !== 1) resetLbZoom(); else closeLightbox(); }
       if (e.key === 'ArrowRight') nextImage();
       if (e.key === 'ArrowLeft') prevImage();
+      if (e.key === '0') resetLbZoom();
     });
     let touchStartX = 0;
     document.getElementById('lightbox').addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive:true });
     document.getElementById('lightbox').addEventListener('touchend', (e) => {
+      // While zoomed a horizontal drag is a pan, not a swipe to the next image.
+      if (lbZoom !== 1) return;
       const dx = e.changedTouches[0].screenX - touchStartX;
       if (Math.abs(dx) > 50) { dx < 0 ? nextImage() : prevImage(); }
     }, { passive:true });
