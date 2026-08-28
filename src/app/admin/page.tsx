@@ -73,6 +73,12 @@ type OverviewItem = {
 
 const API = (p: string) => `/api${p}`;
 
+/** The two portfolio categories, each ordered independently. */
+const CATEGORIES = [
+  { key: "advertising", label: "Advertising" },
+  { key: "food-beverage", label: "Food & Beverage" },
+] as const;
+
 /**
  * POST /api/upload used to return { url, filename }. It now returns a manifest
  * describing the stored master and its AVIF/WebP derivatives.
@@ -282,7 +288,9 @@ function ProjectsTab() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const r = await fetch(API("/projects?category=all"), { cache: "no-store" });
+      // includeUnpublished so drafts stay reachable here — they are hidden from
+      // the public site but must remain editable and orderable.
+      const r = await fetch(API("/projects?category=all&includeUnpublished=1"), { cache: "no-store" });
       const j = await r.json();
       setProjects(j.projects || []);
       setLoading(false);
@@ -290,6 +298,33 @@ function ProjectsTab() {
     refreshRef.current = load;
     load();
   }, []);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } })
+  );
+
+  /**
+   * Reorder within one category. The two categories keep independent
+   * sequences, so only the dragged category's ids are sent.
+   */
+  async function reorderCategory(category: string, ids: string[]) {
+    // Optimistic: splice the new sequence back into the full list so the other
+    // category's rows keep their existing positions on screen.
+    setProjects(prev => {
+      const rank = new Map(ids.map((id, i) => [id, i]));
+      return prev.map(p => (rank.has(p.id) ? { ...p, order: rank.get(p.id)! } : p));
+    });
+    const r = await fetch(API("/projects/reorder"), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category, order: ids }),
+    });
+    if (!r.ok) {
+      alert("Could not save the new order.");
+    }
+    refreshRef.current();
+  }
 
   async function remove(id: string) {
     if (!confirm("Delete this project and all its images?")) return;
@@ -339,35 +374,126 @@ function ProjectsTab() {
       </div>
 
       {loading ? <p className="text-white/50">Loading…</p> : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {projects.map(p => (
-            <div key={p.id} className={`border p-4 flex gap-4 ${p.overview ? "border-sky-400/40 bg-sky-400/5" : p.featured ? "border-yellow-400/40 bg-yellow-400/5" : "border-white/10"}`}>
-              <img src={p.coverImage} alt={p.title} className="w-20 h-20 object-cover flex-shrink-0 bg-white/5" />
-              <div className="flex-1 min-w-0">
-                <h3 className="font-serif text-lg truncate flex items-center gap-2 flex-wrap">
-                  {p.title}
-                  {p.overview && <span className="text-sky-400 text-[9px] tracking-[0.2em] uppercase border border-sky-400/40 px-1.5 py-0.5">Overview</span>}
-                  {p.featured && <span className="text-yellow-400 text-[9px] tracking-[0.2em] uppercase border border-yellow-400/40 px-1.5 py-0.5">★ Slideshow</span>}
-                </h3>
-                <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mt-1">
-                  {p.category} · {p.images.length} img{p.images.length !== 1 ? "s" : ""} · {p.published ? "Published" : "Draft"}
-                </p>
-                <div className="flex gap-3 mt-3 flex-wrap">
-                  <button onClick={() => setEditing(p)} className="text-[10px] tracking-[0.2em] uppercase text-white/70 hover:text-white">Edit</button>
-                  <button onClick={() => toggleOverview(p)} className={`text-[10px] tracking-[0.2em] uppercase ${p.overview ? "text-sky-400" : "text-white/50 hover:text-sky-400"}`}>
-                    {p.overview ? "◆ On Overview" : "◇ Add to Overview"}
-                  </button>
-                  <button onClick={() => toggleFeatured(p)} className={`text-[10px] tracking-[0.2em] uppercase ${p.featured ? "text-yellow-400" : "text-white/50 hover:text-yellow-400"}`}>
-                    {p.featured ? "★ Slideshow" : "☆ Add to slideshow"}
-                  </button>
-                  <button onClick={() => remove(p.id)} className="text-[10px] tracking-[0.2em] uppercase text-red-400/70 hover:text-red-400">Delete</button>
+        <div className="flex flex-col gap-10">
+          {CATEGORIES.map(cat => {
+            const inCat = projects
+              .filter(p => p.category === cat.key)
+              .sort((a, b) => a.order - b.order);
+            if (inCat.length === 0) return null;
+            // How many projects sit on a position shared with another — not the
+            // count of duplicate values, which reads as one project too few.
+            const perOrder = new Map<number, number>();
+            for (const p of inCat) perOrder.set(p.order, (perOrder.get(p.order) ?? 0) + 1);
+            const tied = inCat.filter(p => (perOrder.get(p.order) ?? 0) > 1).length;
+            return (
+              <section key={cat.key}>
+                <div className="flex items-baseline gap-3 mb-3 flex-wrap border-b border-white/10 pb-2">
+                  <h3 className="font-serif text-xl">{cat.label}</h3>
+                  <span className="text-[10px] tracking-[0.2em] uppercase text-white/40">
+                    {inCat.length} · drag ⠿ to reorder (top = first on site)
+                  </span>
+                  {tied > 0 && (
+                    <span className="text-amber-400/90 text-xs">
+                      {tied} projects share a position — the first drag here renumbers this category cleanly,
+                      so some may settle into place once.
+                    </span>
+                  )}
                 </div>
-              </div>
-            </div>
-          ))}
-          {projects.length === 0 && <p className="text-white/50 col-span-2">No projects yet. Click “New Project” to add one.</p>}
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(e: DragEndEvent) => {
+                    const { active, over } = e;
+                    if (!over || active.id === over.id) return;
+                    const oldIndex = inCat.findIndex(p => p.id === active.id);
+                    const newIndex = inCat.findIndex(p => p.id === over.id);
+                    if (oldIndex < 0 || newIndex < 0) return;
+                    reorderCategory(cat.key, arrayMove(inCat, oldIndex, newIndex).map(p => p.id));
+                  }}
+                >
+                  <SortableContext items={inCat.map(p => p.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {inCat.map((p, i) => (
+                        <SortableProjectCard
+                          key={p.id}
+                          p={p}
+                          index={i}
+                          onEdit={() => setEditing(p)}
+                          onRemove={remove}
+                          onToggleOverview={toggleOverview}
+                          onToggleFeatured={toggleFeatured}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </section>
+            );
+          })}
         </div>
       )}
+      {!loading && projects.length === 0 && (
+        <p className="text-white/50">No projects yet. Click “New Project” to add one.</p>
+      )}
+    </div>
+  );
+}
+
+/* Project card, draggable by its ⠿ grip.
+   The grip carries the dnd-kit listeners rather than the whole card: this card
+   holds four buttons and dragging from anywhere would swallow their clicks. */
+function SortableProjectCard({ p, index, onEdit, onRemove, onToggleOverview, onToggleFeatured }: {
+  p: Project;
+  index: number;
+  onEdit: () => void;
+  onRemove: (id: string) => void;
+  onToggleOverview: (p: Project) => void;
+  onToggleFeatured: (p: Project) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: p.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 1,
+  };
+  const border = p.overview
+    ? "border-sky-400/40 bg-sky-400/5"
+    : p.featured
+      ? "border-yellow-400/40 bg-yellow-400/5"
+      : "border-white/10";
+  return (
+    <div ref={setNodeRef} style={style} className={`border p-4 flex gap-3 ${border} ${!p.published ? "opacity-60" : ""}`}>
+      <button
+        {...attributes}
+        {...listeners}
+        aria-label={`Reorder ${p.title}`}
+        title="Drag to reorder"
+        className="flex-shrink-0 self-stretch px-1 text-white/30 hover:text-white/80 cursor-grab active:cursor-grabbing touch-none"
+      >⠿</button>
+      <span className="flex-shrink-0 self-start text-[10px] text-white/30 font-mono pt-1 w-6 text-right">{String(index + 1).padStart(2, "0")}</span>
+      <img src={p.coverImage} alt={p.title} className="w-20 h-20 object-cover flex-shrink-0 bg-white/5" draggable={false} />
+      <div className="flex-1 min-w-0">
+        <h3 className="font-serif text-lg truncate flex items-center gap-2 flex-wrap">
+          {p.title}
+          {!p.published && <span className="text-white/60 text-[9px] tracking-[0.2em] uppercase border border-white/30 px-1.5 py-0.5">Draft</span>}
+          {p.overview && <span className="text-sky-400 text-[9px] tracking-[0.2em] uppercase border border-sky-400/40 px-1.5 py-0.5">Overview</span>}
+          {p.featured && <span className="text-yellow-400 text-[9px] tracking-[0.2em] uppercase border border-yellow-400/40 px-1.5 py-0.5">★ Slideshow</span>}
+        </h3>
+        <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mt-1">
+          {p.category} · {p.images.length} img{p.images.length !== 1 ? "s" : ""} · {p.published ? "Published" : "Draft"}
+        </p>
+        <div className="flex gap-3 mt-3 flex-wrap">
+          <button onClick={onEdit} className="text-[10px] tracking-[0.2em] uppercase text-white/70 hover:text-white">Edit</button>
+          <button onClick={() => onToggleOverview(p)} className={`text-[10px] tracking-[0.2em] uppercase ${p.overview ? "text-sky-400" : "text-white/50 hover:text-sky-400"}`}>
+            {p.overview ? "◆ On Overview" : "◇ Add to Overview"}
+          </button>
+          <button onClick={() => onToggleFeatured(p)} className={`text-[10px] tracking-[0.2em] uppercase ${p.featured ? "text-yellow-400" : "text-white/50 hover:text-yellow-400"}`}>
+            {p.featured ? "★ Slideshow" : "☆ Add to slideshow"}
+          </button>
+          <button onClick={() => onRemove(p.id)} className="text-[10px] tracking-[0.2em] uppercase text-red-400/70 hover:text-red-400">Delete</button>
+        </div>
+      </div>
     </div>
   );
 }

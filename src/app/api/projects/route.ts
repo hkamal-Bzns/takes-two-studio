@@ -16,7 +16,14 @@ import { pickDerivatives } from "@/lib/images";
  */
 export async function GET(req: NextRequest) {
   const category = req.nextUrl.searchParams.get("category");
-  const where: { published?: boolean; category?: string; overview?: boolean } = { published: true };
+  // `includeUnpublished=1` is admin-only and opt-in: the admin panel needs to
+  // see drafts, otherwise unticking Published makes a project vanish from the
+  // only screen that could bring it back. Falls through to published-only for
+  // anyone without a session, so the public site is unaffected either way.
+  const includeUnpublished =
+    req.nextUrl.searchParams.get("includeUnpublished") === "1" && checkAdmin(req);
+  const where: { published?: boolean; category?: string; overview?: boolean } =
+    includeUnpublished ? {} : { published: true };
   if (category && category !== "overview" && category !== "all") {
     where.category = category;
   }
