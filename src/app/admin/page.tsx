@@ -73,6 +73,30 @@ type OverviewItem = {
 
 const API = (p: string) => `/api${p}`;
 
+/**
+ * Narrowest rung of a srcset, for admin thumbnails.
+ *
+ * Every image here is drawn at 80-120px, but `url` points at the widest
+ * derivative (3200.webp) because that is what the public site and the lightbox
+ * want. Rendering the wide one meant the project list alone pulled ~36 MB
+ * across ~110 covers to paint 80x80 squares, which is enough to hang the tab.
+ *
+ * Falls back to the given url when there is no srcset — pre-pipeline images
+ * have none, and they are small anyway.
+ */
+function thumbUrl(url: string, ...srcsets: (string | null | undefined)[]): string {
+  for (const set of srcsets) {
+    if (!set) continue;
+    let best: { u: string; w: number } | null = null;
+    for (const part of set.split(",")) {
+      const m = part.trim().match(/^(\S+)\s+(\d+)w$/);
+      if (m && (!best || Number(m[2]) < best.w)) best = { u: m[1], w: Number(m[2]) };
+    }
+    if (best) return best.u;
+  }
+  return url;
+}
+
 /** The two portfolio categories, each ordered independently. */
 const CATEGORIES = [
   { key: "advertising", label: "Advertising" },
@@ -472,7 +496,7 @@ function SortableProjectCard({ p, index, onEdit, onRemove, onToggleOverview, onT
         className="flex-shrink-0 self-stretch px-1 text-white/30 hover:text-white/80 cursor-grab active:cursor-grabbing touch-none"
       >⠿</button>
       <span className="flex-shrink-0 self-start text-[10px] text-white/30 font-mono pt-1 w-6 text-right">{String(index + 1).padStart(2, "0")}</span>
-      <img src={p.coverImage} alt={p.title} className="w-20 h-20 object-cover flex-shrink-0 bg-white/5" draggable={false} />
+      <img src={thumbUrl(p.coverImage, p.srcsetWebp, p.srcsetAvif)} alt={p.title} loading="lazy" decoding="async" width={80} height={80} className="w-20 h-20 object-cover flex-shrink-0 bg-white/5" draggable={false} />
       <div className="flex-1 min-w-0">
         <h3 className="font-serif text-lg truncate flex items-center gap-2 flex-wrap">
           {p.title}
@@ -573,12 +597,22 @@ function OverviewTab() {
   // so the grid can serve a responsive srcset instead of one flat file. Images
   // predating the pipeline carry null srcsets and render at whatever size they
   // happen to be — fine as a fallback, but not what you want to pick fresh.
-  const allImages: { url: string; projectId: string; title: string; category: string; sharp: boolean }[] = [];
+  // `thumb` is the narrowest rung: this picker can list 500+ images, and at the
+  // widest derivative that is hundreds of MB to draw a grid of squares.
+  const allImages: {
+    url: string; thumb: string; projectId: string; title: string; category: string; sharp: boolean;
+  }[] = [];
   for (const p of allProjects) {
-    allImages.push({ url: p.coverImage, projectId: p.id, title: p.title, category: p.category, sharp: !!p.srcsetAvif });
+    allImages.push({
+      url: p.coverImage, thumb: thumbUrl(p.coverImage, p.srcsetWebp, p.srcsetAvif),
+      projectId: p.id, title: p.title, category: p.category, sharp: !!p.srcsetAvif,
+    });
     for (const img of p.images) {
       if (img.url !== p.coverImage) {
-        allImages.push({ url: img.url, projectId: p.id, title: p.title, category: p.category, sharp: !!img.srcsetAvif });
+        allImages.push({
+          url: img.url, thumb: thumbUrl(img.url, img.srcsetWebp, img.srcsetAvif),
+          projectId: p.id, title: p.title, category: p.category, sharp: !!img.srcsetAvif,
+        });
       }
     }
   }
@@ -636,7 +670,7 @@ function OverviewTab() {
                   className={`relative group aspect-square overflow-hidden border ${added ? "border-green-400/40 opacity-40 cursor-not-allowed" : "border-white/10 hover:border-white/50 cursor-pointer"}`}
                   title={img.title}
                 >
-                  <img src={img.url} alt={img.title} className="w-full h-full object-cover" />
+                  <img src={img.thumb} alt={img.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   {!img.sharp && (
                     <span className="absolute top-0 left-0 bg-amber-500/90 text-black text-[8px] px-1 py-0.5 tracking-wide" title="No responsive derivatives — predates the image pipeline">Low-res</span>
                   )}
@@ -695,7 +729,7 @@ function SortableOverviewItem({ item, index, onRemove, allProjects, onLinkProjec
   const linkedProject = allProjects.find(p => p.id === item.projectId);
   return (
     <div ref={setNodeRef} style={style} className="relative group select-none" {...attributes} {...listeners}>
-      <img src={item.url} alt={item.caption || ""} className="w-full aspect-square object-cover bg-white/5 pointer-events-none" draggable={false} />
+      <img src={thumbUrl(item.url, item.srcsetWebp, item.srcsetAvif)} alt={item.caption || ""} loading="lazy" decoding="async" className="w-full aspect-square object-cover bg-white/5 pointer-events-none" draggable={false} />
       <span className="absolute top-1 left-1 bg-black/70 text-white/80 text-[9px] w-5 h-5 flex items-center justify-center pointer-events-none">{String(index + 1).padStart(2, "0")}</span>
       <span className="absolute top-1 left-7 bg-black/70 text-white/50 text-[9px] px-1 h-5 flex items-center pointer-events-none">⠿</span>
       {/* No derivatives resolved for this url — it renders as one flat file. */}
@@ -978,7 +1012,7 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
           {/* Cover image */}
           <Field label="Cover Image">
             <div className="flex gap-3 items-start">
-              {coverImage && <img src={coverImage} alt="cover" className="w-24 h-24 object-cover bg-white/5" />}
+              {coverImage && <img src={thumbUrl(coverImage, coverDerivatives?.srcsetWebp, coverDerivatives?.srcsetAvif)} alt="cover" loading="lazy" decoding="async" className="w-24 h-24 object-cover bg-white/5" />}
               <div className="flex-1">
                 {/* Typing a path by hand points at an image with no manifest,
                     so any derivatives from a previous cover must be dropped. */}
@@ -1068,7 +1102,7 @@ function SortableImage({ img, isCover, onRemove, onSetCover }: {
       {...attributes}
       {...listeners}
     >
-      <img src={img.url} alt={img.caption || ""} className="w-full aspect-square object-cover bg-white/5 pointer-events-none" draggable={false} />
+      <img src={thumbUrl(img.url, img.srcsetWebp, img.srcsetAvif)} alt={img.caption || ""} loading="lazy" decoding="async" className="w-full aspect-square object-cover bg-white/5 pointer-events-none" draggable={false} />
       <span className="absolute top-1 left-1 bg-black/70 text-white/70 text-[9px] w-5 h-5 flex items-center justify-center pointer-events-none">⠿</span>
       <button
         onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemove(img.id); }}
@@ -1192,7 +1226,7 @@ function BulkImport({ onClose, onDone }: { onClose: () => void; onDone: () => vo
             {rows.map((r, i) => (
               <div key={r.id} className="flex items-center gap-4 border border-white/10 p-3">
                 <span className="text-[10px] tracking-[0.2em] uppercase text-white/30 w-6">{String(i + 1).padStart(2, "0")}</span>
-                <img src={r.url} alt="" className="w-14 h-14 object-cover bg-white/5 flex-shrink-0" />
+                <img src={thumbUrl(r.url, r.srcsetWebp, r.srcsetAvif)} alt="" loading="lazy" decoding="async" className="w-14 h-14 object-cover bg-white/5 flex-shrink-0" />
                 <input
                   value={r.title}
                   onChange={e => updateRow(r.id, { title: e.target.value })}
