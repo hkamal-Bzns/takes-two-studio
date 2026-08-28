@@ -58,13 +58,18 @@ type Client = {
   logo: string | null;
   order: number;
 };
+/**
+ * GET /api/overview enriches each row with the derivatives of whatever image
+ * the url points at, so the client can tell a sharp pick from a legacy one.
+ * Null srcsetAvif means no derivatives were found — the plain url is rendered.
+ */
 type OverviewItem = {
   id: string;
   url: string;
   projectId: string | null;
   caption: string | null;
   order: number;
-};
+} & Derivatives;
 
 const API = (p: string) => `/api${p}`;
 
@@ -374,6 +379,9 @@ function OverviewTab() {
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerFilter, setPickerFilter] = useState("");
+  // Defaults on: picking a pre-pipeline image is almost always a mistake, so
+  // they are hidden until asked for rather than merely marked.
+  const [sharpOnly, setSharpOnly] = useState(true);
   const refreshRef = useRef<() => void>(() => {});
 
   const sensors = useSensors(
@@ -434,20 +442,29 @@ function OverviewTab() {
     });
   }
 
-  // build a flat list of all available images (cover + gallery) for the picker
-  const allImages: { url: string; projectId: string; title: string; category: string }[] = [];
+  // build a flat list of all available images (cover + gallery) for the picker.
+  // `sharp` marks an image that came through the pipeline: it has derivatives,
+  // so the grid can serve a responsive srcset instead of one flat file. Images
+  // predating the pipeline carry null srcsets and render at whatever size they
+  // happen to be — fine as a fallback, but not what you want to pick fresh.
+  const allImages: { url: string; projectId: string; title: string; category: string; sharp: boolean }[] = [];
   for (const p of allProjects) {
-    allImages.push({ url: p.coverImage, projectId: p.id, title: p.title, category: p.category });
+    allImages.push({ url: p.coverImage, projectId: p.id, title: p.title, category: p.category, sharp: !!p.srcsetAvif });
     for (const img of p.images) {
       if (img.url !== p.coverImage) {
-        allImages.push({ url: img.url, projectId: p.id, title: p.title, category: p.category });
+        allImages.push({ url: img.url, projectId: p.id, title: p.title, category: p.category, sharp: !!img.srcsetAvif });
       }
     }
   }
   const itemUrls = new Set(items.map(i => i.url));
-  const filtered = pickerFilter
+  const lowResAvailable = allImages.filter(a => !a.sharp).length;
+  const byText = pickerFilter
     ? allImages.filter(a => a.title.toLowerCase().includes(pickerFilter.toLowerCase()) || a.category.includes(pickerFilter.toLowerCase()))
     : allImages;
+  const filtered = sharpOnly ? byText.filter(a => a.sharp) : byText;
+
+  // Items already in the grid that have no derivatives — worth replacing.
+  const lowResItems = items.filter(i => !i.srcsetAvif);
 
   if (loading) return <p className="text-white/50">Loading…</p>;
 
@@ -468,10 +485,20 @@ function OverviewTab() {
       {/* Image picker */}
       {showPicker && (
         <div className="border border-white/10 p-4 mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <input value={pickerFilter} onChange={e => setPickerFilter(e.target.value)} placeholder="Filter by project title or category…" className="flex-1 bg-transparent border-b border-white/15 pb-1 text-white text-sm focus:outline-none focus:border-white" />
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <input value={pickerFilter} onChange={e => setPickerFilter(e.target.value)} placeholder="Filter by project title or category…" className="flex-1 min-w-[200px] bg-transparent border-b border-white/15 pb-1 text-white text-sm focus:outline-none focus:border-white" />
+            <label className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase cursor-pointer select-none">
+              <input type="checkbox" checked={sharpOnly} onChange={e => setSharpOnly(e.target.checked)} className="w-4 h-4" />
+              <span className={sharpOnly ? "text-emerald-400" : "text-white/50"}>Sharp only</span>
+            </label>
             <span className="text-[10px] tracking-[0.2em] uppercase text-white/40">{filtered.length} available</span>
           </div>
+          {sharpOnly && lowResAvailable > 0 && (
+            <p className="text-white/40 text-xs mb-3">
+              {lowResAvailable} low-resolution image{lowResAvailable === 1 ? "" : "s"} hidden — these predate the image
+              pipeline and have no responsive derivatives. Untick “Sharp only” to show them.
+            </p>
+          )}
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-[400px] overflow-y-auto">
             {filtered.map((img, i) => {
               const added = itemUrls.has(img.url);
@@ -484,6 +511,9 @@ function OverviewTab() {
                   title={img.title}
                 >
                   <img src={img.url} alt={img.title} className="w-full h-full object-cover" />
+                  {!img.sharp && (
+                    <span className="absolute top-0 left-0 bg-amber-500/90 text-black text-[8px] px-1 py-0.5 tracking-wide" title="No responsive derivatives — predates the image pipeline">Low-res</span>
+                  )}
                   <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] px-1 py-0.5 truncate">{img.title}</span>
                   {added ? (
                     <span className="absolute inset-0 flex items-center justify-center text-green-400 text-xs">✓ Added</span>
@@ -502,7 +532,15 @@ function OverviewTab() {
         <p className="text-white/50">No images in the Overview yet. Click “+ Add Images” to curate the homepage grid.</p>
       ) : (
         <>
-          <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-3">Drag to reorder (top = first on page)</p>
+          <div className="flex items-baseline gap-3 mb-3 flex-wrap">
+            <p className="text-[10px] tracking-[0.2em] uppercase text-white/40">Drag to reorder (top = first on page)</p>
+            {lowResItems.length > 0 && (
+              <p className="text-amber-400/90 text-xs">
+                {lowResItems.length} of {items.length} {lowResItems.length === 1 ? "image is" : "images are"} low-resolution
+                — marked below. Replace with a sharp version when you have one.
+              </p>
+            )}
+          </div>
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={items.map(i => i.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -534,6 +572,13 @@ function SortableOverviewItem({ item, index, onRemove, allProjects, onLinkProjec
       <img src={item.url} alt={item.caption || ""} className="w-full aspect-square object-cover bg-white/5 pointer-events-none" draggable={false} />
       <span className="absolute top-1 left-1 bg-black/70 text-white/80 text-[9px] w-5 h-5 flex items-center justify-center pointer-events-none">{String(index + 1).padStart(2, "0")}</span>
       <span className="absolute top-1 left-7 bg-black/70 text-white/50 text-[9px] px-1 h-5 flex items-center pointer-events-none">⠿</span>
+      {/* No derivatives resolved for this url — it renders as one flat file. */}
+      {!item.srcsetAvif && (
+        <span
+          className="absolute top-1 left-1/2 -translate-x-1/2 bg-amber-500/90 text-black text-[8px] px-1 py-0.5 tracking-wide pointer-events-none"
+          title="No responsive derivatives — this image predates the pipeline, or its source is no longer a project image"
+        >Low-res</span>
+      )}
       <button
         onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemove(item.id); }}
         onPointerDown={(e) => e.stopPropagation()}
