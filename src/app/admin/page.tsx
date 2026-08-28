@@ -670,6 +670,25 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
     setImages(j.project?.images || []);
   }
 
+  /**
+   * Promote a gallery image to the cover. Takes the image's own pipeline URL
+   * and srcsets rather than re-uploading, so the cover is the same sharp,
+   * responsive derivative the gallery already serves. Legacy /shoots/ rows
+   * carry null derivatives — that is the documented fallback, not a failure.
+   *
+   * Local state only: the change lands with "Update Project", like every other
+   * field. Identical to what uploadFiles(..., asCover) does with a fresh upload.
+   */
+  function setAsCover(img: Image) {
+    setCoverImage(img.url);
+    setCoverDerivatives({
+      srcsetAvif: img.srcsetAvif ?? null,
+      srcsetWebp: img.srcsetWebp ?? null,
+      width: img.width ?? null,
+      height: img.height ?? null,
+    });
+  }
+
   async function removeImage(imgId: string) {
     // Staged images have no row to delete — dropping them from the list is
     // the whole operation. Their uploaded files stay in MEDIA_ROOT (follow-up).
@@ -819,7 +838,13 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
                 <SortableContext items={gallery.map(i => i.id)} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-3 gap-3">
                     {gallery.map(img => (
-                      <SortableImage key={img.id} img={img} onRemove={removeImage} />
+                      <SortableImage
+                        key={img.id}
+                        img={img}
+                        isCover={!!coverImage && img.url === coverImage}
+                        onRemove={removeImage}
+                        onSetCover={setAsCover}
+                      />
                     ))}
                   </div>
                 </SortableContext>
@@ -850,7 +875,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /* ---------------- Sortable Image (drag-to-reorder) ---------------- */
-function SortableImage({ img, onRemove }: { img: Image; onRemove: (id: string) => void }) {
+function SortableImage({ img, isCover, onRemove, onSetCover }: {
+  img: Image;
+  isCover: boolean;
+  onRemove: (id: string) => void;
+  onSetCover: (img: Image) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: img.id });
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -860,7 +890,13 @@ function SortableImage({ img, onRemove }: { img: Image; onRemove: (id: string) =
     touchAction: "none",
   };
   return (
-    <div ref={setNodeRef} style={style} className="relative group select-none" {...attributes} {...listeners}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative group select-none ${isCover ? "ring-2 ring-yellow-400" : ""}`}
+      {...attributes}
+      {...listeners}
+    >
       <img src={img.url} alt={img.caption || ""} className="w-full aspect-square object-cover bg-white/5 pointer-events-none" draggable={false} />
       <span className="absolute top-1 left-1 bg-black/70 text-white/70 text-[9px] w-5 h-5 flex items-center justify-center pointer-events-none">⠿</span>
       <button
@@ -868,6 +904,22 @@ function SortableImage({ img, onRemove }: { img: Image; onRemove: (id: string) =
         onPointerDown={(e) => e.stopPropagation()}
         className="absolute top-1 right-1 bg-black/70 text-white w-6 h-6 text-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
       >×</button>
+      {/* Cover control. The badge is status and always visible; the button
+          follows the × pattern. Both stop pointer events reaching the wrapper,
+          which carries the dnd-kit listeners — without that a click starts a
+          drag instead of firing. */}
+      {isCover ? (
+        <span className="absolute bottom-1 left-1 bg-yellow-400 text-black text-[9px] px-1.5 py-0.5 tracking-wide pointer-events-none">
+          ★ Current cover
+        </span>
+      ) : (
+        <button
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onSetCover(img); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          title="Use this image as the project cover"
+          className="absolute bottom-1 left-1 bg-black/70 text-white/80 text-[9px] px-1.5 py-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-yellow-400 transition-opacity z-10"
+        >☆ Set as cover</button>
+      )}
     </div>
   );
 }
