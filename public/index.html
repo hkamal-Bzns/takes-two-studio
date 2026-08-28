@@ -760,7 +760,11 @@
        browser uses this to pick from the srcset BEFORE layout, so it has to be
        stated here rather than inferred. */
     const SIZES = {
-      hero:    '100vw',
+      /* 108vw, not 100vw: .hero-slide img is width:108% of a full-width slide
+         (it overflows so panDrift has somewhere to travel). Declaring 100vw
+         under-states the real display width, which can make the browser pick
+         one rung below what it ends up painting. */
+      hero:    '108vw',
       cover:   '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw',
       project: '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw',
       logo:    '140px'
