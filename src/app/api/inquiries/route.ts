@@ -3,21 +3,12 @@ import { db } from "@/lib/db";
 import { checkAdmin } from "@/lib/auth";
 
 /**
- * POST /api/inquiries   — public, create an inquiry from the contact form.
- * GET  /api/inquiries   — admin, list all inquiries (newest first).
+ * GET /api/inquiries — admin, list all inquiries (newest first).
+ *
+ * There is no POST any more: the public contact form was removed, so nothing
+ * creates inquiries. This route stays so previously submitted ones remain
+ * readable in the admin panel. It is admin-only, and was never public.
  */
-export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { firstName, lastName, phone, email, message } = body;
-  if (!firstName || !lastName || !phone || !email || !message) {
-    return NextResponse.json({ error: "All fields are required" }, { status: 400 });
-  }
-  const inquiry = await db.inquiry.create({
-    data: { firstName, lastName, phone, email, message },
-  });
-  return NextResponse.json({ inquiry }, { status: 201 });
-}
-
 export async function GET(req: NextRequest) {
   if (!checkAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const status = req.nextUrl.searchParams.get("status");

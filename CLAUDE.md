@@ -57,9 +57,12 @@ import { checkAdmin, unauthorized } from "@/lib/auth";
 if (!checkAdmin(req)) return unauthorized();
 ```
 
-The only routes that are legitimately public: `POST /api/inquiries` (contact
-form), `GET /api/projects`, `GET /api/overview`, `GET /api/settings`,
-`GET /api/media/*`.
+The only routes that are legitimately public: `GET /api/projects`,
+`GET /api/overview`, `GET /api/settings`, `GET /api/media/*`.
+
+There is no public write route. `POST /api/inquiries` used to be one, backing
+the contact form; both were removed. Every remaining route that mutates
+anything checks auth.
 
 ## Conventions
 

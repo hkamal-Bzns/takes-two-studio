@@ -43,8 +43,6 @@
       --border-soft: rgba(255,255,255,0.06);
       --line: rgba(255,255,255,0.22);
       --card: #181818;
-      --field-border: rgba(255,255,255,0.2);
-      --field-ph: rgba(255,255,255,0.3);
       --overlay: rgba(0,0,0,0.6);
       --shadow: rgba(0,0,0,0.8);
       --bar-bg: rgba(20, 20, 22, 0.82);   /* dark grey translucent floating bar */
@@ -62,8 +60,6 @@
       --border-soft: rgba(0,0,0,0.07);
       --line: rgba(0,0,0,0.25);
       --card: #f4f4f4;
-      --field-border: rgba(0,0,0,0.25);
-      --field-ph: rgba(0,0,0,0.4);
       --overlay: rgba(255,255,255,0.6);
       --shadow: rgba(0,0,0,0.25);
       --bar-bg: rgba(35, 35, 38, 0.82);   /* dark grey translucent floating bar — same in both modes */
@@ -242,11 +238,6 @@
     .mobile-menu { max-height:0; overflow:hidden; transition:max-height .5s var(--ease); }
     .mobile-menu.open { max-height:520px; }
 
-    /* ---------- Contact form (bottom-border, theme-aware) ---------- */
-    .field { background:transparent; border:none; border-bottom:1px solid var(--field-border); border-radius:0; padding:0.85rem 0; width:100%; font-family:'Montserrat',sans-serif; font-weight:300; color:var(--text); transition:border-color .3s var(--ease); }
-    .field:focus { outline:none; border-bottom-color:var(--text); }
-    .field::placeholder { color:var(--field-ph); font-weight:300; }
-
     ::-webkit-scrollbar { width:8px; height:8px; }
     ::-webkit-scrollbar-track { background:var(--bg); }
     ::-webkit-scrollbar-thumb { background:var(--line); }
@@ -414,7 +405,7 @@
             <p id="contact-eyebrow" class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-5">Get in Touch</p>
             <h2 id="contact-heading" class="font-serif text-4xl md:text-5xl leading-tight t-text">For bookings<br/><em>&amp; inquiries.</em></h2>
           </div>
-          <div class="space-y-8 mb-16 reveal" style="transition-delay:0.1s;">
+          <div class="space-y-8 reveal" style="transition-delay:0.1s;">
             <div class="text-center">
               <p class="text-[10px] tracking-[0.3em] uppercase t-text-faint mb-2">General</p>
               <a href="mailto:info@takestwostudio.com" class="text-lg md:text-xl font-light hover:opacity-60 transition-opacity">info@takestwostudio.com</a>
@@ -450,37 +441,6 @@
               <a href="mailto:Hazem@takestwostudio.com" class="text-sm font-light t-text-soft hover:opacity-60 transition-opacity">Hazem@takestwostudio.com</a>
             </div>
           </div>
-          <form id="contact-form" class="space-y-8 reveal" style="transition-delay:0.2s;" onsubmit="return submitForm(event);">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-8">
-              <div>
-                <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="firstname">First Name</label>
-                <input id="firstname" name="firstname" type="text" class="field" placeholder="First name" required />
-              </div>
-              <div>
-                <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="lastname">Last Name</label>
-                <input id="lastname" name="lastname" type="text" class="field" placeholder="Last name" required />
-              </div>
-            </div>
-            <div>
-              <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="phone">Phone Number</label>
-              <input id="phone" name="phone" type="tel" class="field" placeholder="+20 ..." required />
-            </div>
-            <div>
-              <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="email">Email</label>
-              <input id="email" name="email" type="email" class="field" placeholder="you@studio.com" required />
-            </div>
-            <div>
-              <label class="block text-[10px] tracking-[0.3em] uppercase t-text-faint mb-1" for="message">Message</label>
-              <textarea id="message" name="message" rows="4" class="field resize-none" placeholder="Tell us about your project..." required></textarea>
-            </div>
-            <div class="pt-2">
-              <button type="submit" id="submit-btn" class="group inline-flex items-center gap-4 text-[11px] tracking-[0.3em] uppercase font-light pb-2 border-b border-white hover:gap-6 transition-all">
-                Send Message
-                <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" stroke-width="1"/></svg>
-              </button>
-            </div>
-            <p id="form-status" class="text-[11px] tracking-[0.2em] uppercase t-text-faint h-4"></p>
-          </form>
         </div>
       </section>
 
@@ -577,10 +537,6 @@
       const r = await fetch(`/api/projects/${id}`, { cache: 'no-store' });
       const j = await r.json();
       return j.project;
-    }
-    async function submitInquiry(data) {
-      const r = await fetch('/api/inquiries', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
-      return r.ok;
     }
     async function fetchSettings() {
       const r = await fetch('/api/settings', { cache: 'no-store' });
@@ -1307,32 +1263,6 @@
       const dx = e.changedTouches[0].screenX - touchStartX;
       if (Math.abs(dx) > 50) { dx < 0 ? nextImage() : prevImage(); }
     }, { passive:true });
-
-    /* ---------- Contact form (real backend) ---------- */
-    async function submitForm(e) {
-      e.preventDefault();
-      const btn = document.getElementById('submit-btn');
-      const status = document.getElementById('form-status');
-      btn.disabled = true;
-      status.textContent = 'Sending...';
-      const data = {
-        firstName: document.getElementById('firstname').value.trim(),
-        lastName: document.getElementById('lastname').value.trim(),
-        phone: document.getElementById('phone').value.trim(),
-        email: document.getElementById('email').value.trim(),
-        message: document.getElementById('message').value.trim(),
-      };
-      const ok = await submitInquiry(data);
-      btn.disabled = false;
-      if (ok) {
-        status.textContent = 'Thank you — Takes Two Studio will be in touch.';
-        e.target.reset();
-        setTimeout(() => { status.textContent = ''; }, 6000);
-      } else {
-        status.textContent = 'Something went wrong. Please email us directly.';
-      }
-      return false;
-    }
 
     /* ---------- Floating header scroll state ---------- */
     window.addEventListener('scroll', () => {
