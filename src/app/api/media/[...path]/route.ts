@@ -74,7 +74,15 @@ export async function GET(
       "Content-Type": contentType,
       "Content-Length": String(info.size),
       // Filenames contain a UUID, so content never changes under a given URL.
-      "Cache-Control": "public, max-age=31536000, immutable",
+      //
+      // `no-transform` is not a caching hint — it forbids any intermediary from
+      // re-encoding the payload (RFC 9111 §5.2.2.6). The CDN in front of this
+      // app optimises JPEG and PNG by default: it was downscaling a 7644px
+      // master to 1600px, dropping to 4:2:0 chroma and stripping the sRGB
+      // profile, which made "Sharpest" arrive softer than the derivative it was
+      // supposed to beat. AVIF and WebP were passing through untouched, which
+      // is why only the master was affected.
+      "Cache-Control": "public, max-age=31536000, immutable, no-transform",
       "X-Content-Type-Options": "nosniff",
     },
   });
