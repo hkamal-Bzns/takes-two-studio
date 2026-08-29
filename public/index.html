@@ -1381,9 +1381,10 @@
       const footerSubtitle = document.getElementById('footer-subtitle');
       if (footerName) footerName.textContent = siteSettings.footerName !== undefined ? siteSettings.footerName : '';
       if (footerSubtitle) footerSubtitle.innerHTML = (siteSettings.footerSubtitle !== undefined ? siteSettings.footerSubtitle : '').replace(/&/g, '&amp;');
-      // favicon
-      const favicon = document.querySelector('link[rel="icon"]');
-      if (favicon) favicon.href = logoUrl;
+      // The favicon is no longer derived from the logo: it has its own setting
+      // and its own generated set, served from /api/icon/. Pointing the first
+      // <link rel="icon"> at the logo here would overwrite favicon.ico on every
+      // load and silently undo whatever was uploaded.
       // default theme (only if user hasn't manually toggled — respect localStorage)
       if (!localStorage.getItem('tts-theme') && siteSettings.theme) {
         applyTheme(siteSettings.theme);
