@@ -71,3 +71,8 @@ two-*.png
 /main
 /mnt/
 /robots.txt
+
+# Local-only analysis scratch: a downloaded DB snapshot and 400 thumbnails,
+# used to compare covers against galleries off the server. Regenerable, large,
+# and contains a copy of production data — never commit it.
+.local-copy/

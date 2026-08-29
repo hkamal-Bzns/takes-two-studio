@@ -32,6 +32,9 @@ type Image = {
   masterBytes?: number | null;
   /** "Sharpest": serve the original at full size in the zoomed lightbox. */
   useMaster?: boolean;
+  /** Belongs to the cover, not the gallery. Shown here so an original can be
+   *  attached later, but hidden from the public site and the Overview picker. */
+  coverOnly?: boolean;
 } & Derivatives;
 
 /** Human-readable file size for the admin, e.g. "7.2 MB". */
@@ -621,12 +624,18 @@ function OverviewTab() {
     url: string; thumb: string; projectId: string; title: string; category: string; sharp: boolean;
   }[] = [];
   for (const p of allProjects) {
-    allImages.push({
-      url: p.coverImage, thumb: thumbUrl(p.coverImage, p.srcsetWebp, p.srcsetAvif),
-      projectId: p.id, title: p.title, category: p.category, sharp: !!p.srcsetAvif,
-    });
+    // A cover-only cover is a picture the studio never chose to exhibit, so it
+    // is not on offer here either — the Overview is the most prominent surface
+    // on the site. It stays visible in the project editor.
+    const coverIsCoverOnly = p.images.some(i => i.url === p.coverImage && i.coverOnly);
+    if (!coverIsCoverOnly) {
+      allImages.push({
+        url: p.coverImage, thumb: thumbUrl(p.coverImage, p.srcsetWebp, p.srcsetAvif),
+        projectId: p.id, title: p.title, category: p.category, sharp: !!p.srcsetAvif,
+      });
+    }
     for (const img of p.images) {
-      if (img.url !== p.coverImage) {
+      if (img.url !== p.coverImage && !img.coverOnly) {
         allImages.push({
           url: img.url, thumb: thumbUrl(img.url, img.srcsetWebp, img.srcsetAvif),
           projectId: p.id, title: p.title, category: p.category, sharp: !!img.srcsetAvif,
@@ -838,6 +847,7 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
   // that actually matter rather than hunting through the whole grid.
   const [onlyMissingMaster, setOnlyMissingMaster] = useState(false);
   const missingMasterCount = images.filter(i => !i.masterUrl).length;
+  const coverIsGalleryImage = !!coverImage && gallery.some(i => i.url === coverImage);
   const visibleGallery = onlyMissingMaster ? gallery.filter(i => !i.masterUrl && !isStaged(i.id)) : gallery;
 
   async function saveProject(): Promise<string | null> {
@@ -859,7 +869,8 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
     return j.project.id;
   }
 
-  async function uploadFiles(files: FileList, asCover: boolean) {
+  /** Uploads always become gallery images now — a cover is chosen from them. */
+  async function uploadFiles(files: FileList) {
     setUploading(true);
     const uploaded: Uploaded[] = [];
     for (const file of Array.from(files)) {
@@ -867,15 +878,6 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
       if (u) uploaded.push(u);
     }
     setUploading(false);
-
-    if (asCover) {
-      if (uploaded[0]) {
-        const { url, ...derivatives } = uploaded[0];
-        setCoverImage(url);
-        setCoverDerivatives(derivatives);
-      }
-      return;
-    }
     if (!uploaded.length) return;
 
     // With a row in hand the manifests attach immediately; without one they
@@ -906,7 +908,7 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
    * carry null derivatives — that is the documented fallback, not a failure.
    *
    * Local state only: the change lands with "Update Project", like every other
-   * field. Identical to what uploadFiles(..., asCover) does with a fresh upload.
+   * field. This is now the only way a cover is chosen.
    */
   function setAsCover(img: Image) {
     setCoverImage(img.url);
@@ -1070,15 +1072,37 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
           </div>
 
           {/* Cover image */}
+          {/* The cover is one of the gallery images, chosen with "Set as cover"
+              on the tile. It is no longer a separate upload or a typed path:
+              both produced covers that existed outside the gallery, with no
+              image record, no original on file and no way to offer Sharpest —
+              and a typed path is how covers ended up pointing at another
+              project's photograph. */}
           <Field label="Cover Image">
             <div className="flex gap-3 items-start">
-              {coverImage && <img src={thumbUrl(coverImage, coverDerivatives?.srcsetWebp, coverDerivatives?.srcsetAvif)} alt="cover" loading="lazy" decoding="async" className="w-24 h-24 object-cover bg-white/5" />}
-              <div className="flex-1">
-                {/* Typing a path by hand points at an image with no manifest,
-                    so any derivatives from a previous cover must be dropped. */}
-                <input value={coverImage} onChange={e => { setCoverImage(e.target.value); setCoverDerivatives(null); }} placeholder="/shoots/x.jpg or upload" className="adm-field mb-2" />
-                <input type="file" accept="image/*" onChange={e => e.target.files && uploadFiles(e.target.files, true)} disabled={uploading} className="text-[10px] text-white/50" />
-              </div>
+              {coverImage ? (
+                <>
+                  <img src={thumbUrl(coverImage, coverDerivatives?.srcsetWebp, coverDerivatives?.srcsetAvif)} alt="cover" loading="lazy" decoding="async" className="w-24 h-24 object-cover bg-white/5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/60 text-sm">
+                      {coverIsGalleryImage ? "Set from the gallery." : "Not one of this project's gallery images."}
+                    </p>
+                    <p className="text-white/30 text-[11px] mt-1 break-all">{coverImage}</p>
+                    {!coverIsGalleryImage && gallery.length > 0 && (
+                      <p className="text-amber-400/80 text-[11px] mt-2">
+                        Pick a gallery image below with “☆ Set as cover” so the cover has an image
+                        record — that is what carries the original and the quality setting.
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-white/50 text-sm">
+                  {gallery.length > 0
+                    ? "No cover yet — choose one with “☆ Set as cover” on any gallery image."
+                    : "Add a gallery image first, then set it as the cover."}
+                </p>
+              )}
             </div>
           </Field>
 
@@ -1091,7 +1115,7 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
         {/* Right: gallery images (drag to reorder) */}
         <div>
           <Field label={`Gallery Images (${gallery.length})${gallery.length > 1 ? " — drag to reorder" : ""}`}>
-            <input type="file" accept="image/*" multiple onChange={e => e.target.files && uploadFiles(e.target.files, false)} disabled={uploading} className="text-[10px] text-white/50 mb-4" />
+            <input type="file" accept="image/*" multiple onChange={e => e.target.files && uploadFiles(e.target.files)} disabled={uploading} className="text-[10px] text-white/50 mb-4" />
             {uploading && <p className="text-white/50 text-xs mb-2">Uploading…</p>}
             {!pid && staged.length > 0 && (
               <p className="text-white/50 text-xs mb-2">
@@ -1228,8 +1252,17 @@ function SortableImage({ img, isCover, onRemove, onSetCover, onSetUseMaster, onA
           which carries the dnd-kit listeners — without that a click starts a
           drag instead of firing. */}
       {isCover ? (
-        <span className="absolute bottom-1 left-1 bg-yellow-400 text-black text-[9px] px-1.5 py-0.5 tracking-wide pointer-events-none">
-          ★ Current cover
+        <span
+          title={
+            img.coverOnly
+              ? "This is the cover, and only the cover — it is not shown in the project gallery, the lightbox or the Overview picker. Attach the original to rebuild it at full quality."
+              : "This gallery image is the project cover"
+          }
+          className={`absolute bottom-1 left-1 text-[9px] px-1.5 py-0.5 tracking-wide pointer-events-none ${
+            img.coverOnly ? "bg-yellow-400/90 text-black outline outline-1 outline-dashed outline-offset-1 outline-yellow-400/60" : "bg-yellow-400 text-black"
+          }`}
+        >
+          {img.coverOnly ? "★ Cover only" : "★ Current cover"}
         </span>
       ) : (
         <button

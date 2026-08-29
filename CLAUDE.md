@@ -35,6 +35,20 @@ Hosting: Hostinger Node.js app behind Caddy. `next start` on port 3000.
 
 ## Non-negotiables
 
+**Never run bulk image or database analysis on the server.** The hosting is
+shared and cannot absorb sustained image work: a script that decoded ~400
+images in one unbatched loop starved the Node app until the API stopped
+answering and SSH refused connections, and it took a redeploy to recover.
+
+Do it on the local machine instead, against a copy of `~/studio-data` pulled
+down over `scp`/`rsync`. If something genuinely must run on the server, do it
+**one image at a time with a pause between**, and never in a single loop over
+the whole library.
+
+This applies to diagnostics as much as to features. The upload and regeneration
+paths are already batched for exactly this reason — the same limit binds a
+throwaway script, and a read-only script is not automatically a safe one.
+
 **Image quality is the product.** This is a photography studio. Never
 downsample a master, never re-encode an already-encoded derivative, and always
 embed the sRGB ICC profile in output (`.withIccProfile('srgb')`). Use 4:4:4

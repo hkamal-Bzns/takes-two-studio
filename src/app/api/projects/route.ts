@@ -24,6 +24,11 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get("includeUnpublished") === "1" && checkAdmin(req);
   const where: { published?: boolean; category?: string; overview?: boolean } =
     includeUnpublished ? {} : { published: true };
+  // Cover-only images exist so a cover has a record (original, quality
+  // setting); they are not pictures the studio chose to exhibit. Filtering
+  // here rather than in the front end keeps the gallery, the image count and
+  // the lightbox consistent — they all read this one array.
+  const imageWhere = includeUnpublished ? undefined : { coverOnly: false };
   if (category && category !== "overview" && category !== "all") {
     where.category = category;
   }
@@ -34,18 +39,18 @@ export async function GET(req: NextRequest) {
     const flagged = await db.project.findMany({
       where: { ...where, overview: true },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-      include: { images: { orderBy: { order: "asc" } } },
+      include: { images: { where: imageWhere, orderBy: { order: "asc" } } },
     });
     projects = flagged.length > 0 ? flagged : await db.project.findMany({
       where,
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-      include: { images: { orderBy: { order: "asc" } } },
+      include: { images: { where: imageWhere, orderBy: { order: "asc" } } },
     });
   } else {
     projects = await db.project.findMany({
       where,
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-      include: { images: { orderBy: { order: "asc" } } },
+      include: { images: { where: imageWhere, orderBy: { order: "asc" } } },
     });
   }
   return NextResponse.json({ projects });

@@ -8,11 +8,15 @@ import { pickDerivatives } from "@/lib/images";
  * PATCH /api/projects/[id]          — admin, update project fields
  * DELETE /api/projects/[id]         — admin, delete project (cascades images)
  */
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  // Same rule as the list route: cover-only images are part of the cover, not
+  // the gallery, so the public sees the project without them. This is the
+  // route the static site calls when it opens a project.
+  const imageWhere = checkAdmin(req) ? undefined : { coverOnly: false };
   const project = await db.project.findUnique({
     where: { id },
-    include: { images: { orderBy: { order: "asc" } } },
+    include: { images: { where: imageWhere, orderBy: { order: "asc" } } },
   });
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ project });

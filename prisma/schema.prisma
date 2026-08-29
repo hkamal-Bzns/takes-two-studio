@@ -70,6 +70,14 @@ model ProjectImage {
   // derivative. Only meaningful when masterUrl is set; the readers check both.
   useMaster   Boolean @default(false)
 
+  // Exists so a cover has an image record, but is not part of the project's
+  // gallery. Set on covers that were uploaded straight into the cover field
+  // and are a different photograph from anything in the gallery — the record
+  // gives them an original and a quality setting without adding a picture the
+  // studio never chose to show. Hidden from the public gallery, the lightbox
+  // and the Overview picker; visible in the project editor.
+  coverOnly   Boolean @default(false)
+
   @@index([projectId])
 }
 
