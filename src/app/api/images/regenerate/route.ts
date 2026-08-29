@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAdmin, unauthorized } from "@/lib/auth";
-import { bundleIdFromUrl, findMaster, regenerateBundle } from "@/lib/images";
+import sharp from "sharp";
+import { bundleIdFromUrl, findMaster, regenerateBundle, masterColourSpace } from "@/lib/images";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -9,6 +10,8 @@ export const maxDuration = 300;
 /** How many images one call will re-encode. Kept small on purpose — see below. */
 const DEFAULT_BATCH = 5;
 const MAX_BATCH = 20;
+/** Header-only reads are much cheaper than encoding, so this batch is larger. */
+const SPACE_BATCH = 15;
 
 /**
  * GET  /api/images/regenerate  — admin, how much work is outstanding.
@@ -94,6 +97,7 @@ export async function POST(req: NextRequest) {
           width: result.width,
           height: result.height,
           masterBytes: result.master.bytes,
+          masterSpace: result.master.space,
         },
       });
       done.push(img.id);
@@ -146,4 +150,62 @@ export async function PUT(req: NextRequest) {
   }
 
   return NextResponse.json({ scanned: images.length, linked });
+}
+
+/**
+ * PATCH /api/images/regenerate — admin, record the colour space of masters
+ * that have not been measured yet.
+ *
+ * Separate from the regenerate POST because this is far cheaper: it decodes
+ * only each file's header, never the pixels, and writes no derivatives. It is
+ * still batched and cursor-driven, because the same shared-hosting limit that
+ * governs re-encoding governs anything that walks the whole library.
+ */
+export async function PATCH(req: NextRequest) {
+  if (!checkAdmin(req)) return unauthorized();
+
+  const url = req.nextUrl.searchParams;
+  const batch = Math.min(
+    MAX_BATCH,
+    Math.max(1, Number(url.get("batch")) || SPACE_BATCH)
+  );
+
+  const pending = await db.projectImage.findMany({
+    where: { masterUrl: { not: null }, masterSpace: null },
+    select: { id: true, url: true },
+    orderBy: { id: "asc" },
+    take: batch,
+  });
+
+  let measured = 0;
+  const failed: string[] = [];
+  for (const img of pending) {
+    const bundleId = bundleIdFromUrl(img.url);
+    if (!bundleId) continue;
+    try {
+      const master = await findMaster(bundleId);
+      if (!master) continue;
+      const meta = await sharp(master.absPath, { failOn: "none" }).metadata();
+      await db.projectImage.update({
+        where: { id: img.id },
+        data: { masterSpace: masterColourSpace(meta) },
+      });
+      measured++;
+    } catch {
+      // An unreadable master is a fact to report, not a reason to abort the
+      // batch — the next call skips it only if it was written, so record it.
+      failed.push(img.id);
+    }
+  }
+
+  const remaining = await db.projectImage.count({
+    where: { masterUrl: { not: null }, masterSpace: null },
+  });
+
+  return NextResponse.json({
+    measured,
+    failed: failed.length,
+    remaining,
+    finished: remaining === 0 || measured === 0,
+  });
 }

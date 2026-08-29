@@ -77,7 +77,7 @@ export type Derivative = { width: number; url: string; bytes: number };
 
 export type ProcessedImage = {
   id: string;
-  master: { url: string; width: number; height: number; bytes: number; format: string };
+  master: { url: string; width: number; height: number; bytes: number; format: string; space: string };
   avif: Derivative[];
   webp: Derivative[];
   /** Ready-to-use srcset strings for a <picture> element. */
@@ -190,6 +190,7 @@ export async function processUpload(buf: Buffer, originalName: string): Promise<
       height: meta.height,
       bytes: buf.length,
       format,
+      space: masterColourSpace(meta),
     },
     avif,
     webp,
@@ -238,7 +239,7 @@ export async function findMaster(
 
 export type RegenerateResult = DerivativeFields & {
   bundleId: string;
-  master: { url: string; bytes: number; width: number; height: number };
+  master: { url: string; bytes: number; width: number; height: number; space: string };
   wrote: number;
 };
 
@@ -305,7 +306,7 @@ export async function regenerateBundle(bundleId: string): Promise<RegenerateResu
     srcsetWebp: srcset(webp),
     width: meta.width,
     height: meta.height,
-    master: { url: master.url, bytes: master.bytes, width: meta.width, height: meta.height },
+    master: { url: master.url, bytes: master.bytes, width: meta.width, height: meta.height, space: masterColourSpace(meta) },
     wrote,
   };
 }
@@ -362,4 +363,94 @@ export function pickMaster(body: unknown): MasterFields {
       : null;
   // Bytes without a url is meaningless; never store a half-record.
   return url ? { masterUrl: url, masterBytes: bytes } : { masterUrl: null, masterBytes: null };
+}
+
+/* ---------------------------------------------------------------------------
+ * Colour space of a master
+ *
+ * Derivatives are always written with `.withIccProfile("srgb")`, so what the
+ * visitor sees is sRGB whatever the master was. That conversion is only correct
+ * if sharp knows the source space, which it does when the master carries an ICC
+ * profile. Two kinds of master cause trouble:
+ *
+ *   - CMYK, which is a print file with no business in a web pipeline;
+ *   - a wide-gamut profile (Adobe RGB, Display P3, ProPhoto), which converts
+ *     correctly but signals that the export settings were wrong for the web.
+ *
+ * An untagged RGB master is a third case: sharp and every browser assume sRGB,
+ * which is usually right and occasionally silently wrong. Worth surfacing, not
+ * worth alarming about.
+ * ------------------------------------------------------------------------- */
+
+/** Decode a UTF-16BE run, which Node cannot read directly. */
+function utf16be(buf: Buffer, start: number, len: number): string {
+  const end = Math.min(buf.length, start + len);
+  const swapped = Buffer.from(buf.subarray(start, end));
+  if (swapped.length % 2 !== 0) return "";
+  swapped.swap16();
+  return swapped.toString("utf16le").replace(/\0+$/, "");
+}
+
+/** Read the human-readable name out of an ICC profile's `desc` tag. */
+function iccDescription(icc: Buffer): string | null {
+  try {
+    if (icc.length < 132) return null;
+    const tagCount = icc.readUInt32BE(128);
+    if (tagCount < 1 || tagCount > 200) return null;
+    for (let i = 0; i < tagCount; i++) {
+      const entry = 132 + i * 12;
+      if (entry + 12 > icc.length) break;
+      if (icc.toString("ascii", entry, entry + 4) !== "desc") continue;
+
+      const start = icc.readUInt32BE(entry + 4);
+      const size = icc.readUInt32BE(entry + 8);
+      if (start + Math.min(size, 12) > icc.length) return null;
+      const type = icc.toString("ascii", start, start + 4);
+
+      // ICC v2 'desc': 4 signature + 4 reserved + 4 ASCII length, then the text.
+      if (type === "desc") {
+        const len = icc.readUInt32BE(start + 8);
+        const text = icc.toString("ascii", start + 12, start + 12 + Math.max(0, len - 1));
+        return text.trim() || null;
+      }
+      // ICC v4 'mluc': record table at +12; the first record is enough to label it.
+      if (type === "mluc") {
+        const records = icc.readUInt32BE(start + 8);
+        if (records < 1) return null;
+        const len = icc.readUInt32BE(start + 20);
+        const off = icc.readUInt32BE(start + 24);
+        return utf16be(icc, start + off, len).trim() || null;
+      }
+      return null;
+    }
+  } catch {
+    /* a malformed profile is not a reason to fail an upload */
+  }
+  return null;
+}
+
+/** True when a profile name denotes plain sRGB rather than a wider space. */
+function looksLikeSrgb(name: string | null): boolean {
+  if (!name) return false;
+  return /s[\s._-]?rgb/i.test(name) || /^iec[\s._-]?61966/i.test(name);
+}
+
+/**
+ * A short, storable label for a master's colour space:
+ *   "srgb"     — sRGB, by profile
+ *   "untagged" — RGB carrying no profile; assumed sRGB, usually correct
+ *   "cmyk"     — a print file
+ * anything else is the profile's own name, e.g. "Adobe RGB (1998)".
+ */
+export function masterColourSpace(meta: { space?: string; icc?: Buffer }): string {
+  if (meta.space === "cmyk") return "cmyk";
+  if (!meta.icc) return "untagged";
+  const name = iccDescription(meta.icc);
+  if (looksLikeSrgb(name)) return "srgb";
+  return name || "untagged";
+}
+
+/** Whether a stored colour-space label is one the admin should leave alone. */
+export function colourSpaceIsSafe(space: string | null | undefined): boolean {
+  return !space || space === "srgb" || space === "untagged";
 }

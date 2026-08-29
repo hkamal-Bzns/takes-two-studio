@@ -66,6 +66,12 @@ model ProjectImage {
   masterUrl   String?
   masterBytes Int?
 
+  // Colour space of the master: "srgb", "untagged", "cmyk", or the profile's
+  // own name (e.g. "Adobe RGB (1998)"). Derivatives are always converted to
+  // sRGB, so this does not change what visitors see — it flags a master that
+  // was exported wrong, which is worth catching before more arrive like it.
+  masterSpace String?
+
   // "Sharpest": serve `masterUrl` at full size instead of the widest
   // derivative. Only meaningful when masterUrl is set; the readers check both.
   useMaster   Boolean @default(false)

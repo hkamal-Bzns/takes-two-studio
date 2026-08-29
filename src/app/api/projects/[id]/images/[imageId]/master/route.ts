@@ -93,6 +93,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ imageId: s
         height: result.height,
         masterUrl: result.master.url,
         masterBytes: result.master.bytes,
+        masterSpace: result.master.space,
       },
     });
 

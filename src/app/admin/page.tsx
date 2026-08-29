@@ -32,10 +32,22 @@ type Image = {
   masterBytes?: number | null;
   /** "Sharpest": serve the original at full size in the zoomed lightbox. */
   useMaster?: boolean;
+  /** Colour space of the master: "srgb", "untagged", "cmyk", or a profile name.
+   *  Null until measured — unknown is not the same as verified sRGB. */
+  masterSpace?: string | null;
   /** Belongs to the cover, not the gallery. Shown here so an original can be
    *  attached later, but hidden from the public site and the Overview picker. */
   coverOnly?: boolean;
 } & Derivatives;
+
+/** Colour-space labels the admin leaves alone.
+ *  Deliberately a local copy rather than an import from `@/lib/images`: that
+ *  module pulls in sharp, which must never reach the browser bundle. It mirrors
+ *  `colourSpaceIsSafe` there — a null means "not measured yet", which is not a
+ *  finding and must not raise a warning. */
+function spaceIsSafe(space?: string | null): boolean {
+  return !space || space === "srgb" || space === "untagged";
+}
 
 /** Human-readable file size for the admin, e.g. "7.2 MB". */
 function fmtBytes(n?: number | null): string {
@@ -1247,6 +1259,24 @@ function SortableImage({ img, isCover, onRemove, onSetCover, onSetUseMaster, onA
           </label>
         )
       )}
+      {/* Colour-space warning. Derivatives are always converted to sRGB, so
+          this never means visitors are seeing wrong colour — it means the
+          master was exported for print or in a wide gamut, which is worth
+          knowing before a whole shoot arrives the same way. "untagged" is not
+          flagged: every browser assumes sRGB for it, and so does the pipeline. */}
+      {!isStaged(img.id) && !spaceIsSafe(img.masterSpace) && (
+        <span
+          title={
+            img.masterSpace === "cmyk"
+              ? "This master is CMYK — a print file. It converts to sRGB for the web, but the colour will not match what the studio saw. Re-export it as sRGB and attach it again."
+              : `This master is tagged "${img.masterSpace}", not sRGB. It converts correctly, but exporting as sRGB avoids the conversion entirely.`
+          }
+          className="absolute top-1 left-8 bg-orange-500/90 text-black text-[8px] px-1.5 py-0.5 tracking-wide z-10 cursor-help"
+        >
+          {img.masterSpace === "cmyk" ? "⬤ CMYK master" : "⬤ Not sRGB"}
+        </span>
+      )}
+
       {/* Cover control. The badge is status and always visible; the button
           follows the × pattern. Both stop pointer events reaching the wrapper,
           which carries the dnd-kit listeners — without that a click starts a
@@ -1833,6 +1863,26 @@ function RegeneratePanel() {
     refreshRef.current();
   }
 
+  /** Measure the colour space of masters that have not been checked yet.
+   *  Loops in batches like `run()` does, for the same reason, but each batch is
+   *  only reading file headers so it finishes quickly. */
+  async function checkColourSpaces() {
+    let measured = 0;
+    for (;;) {
+      const r = await fetch(API("/images/regenerate"), { method: "PATCH" });
+      const j = await r.json().catch(() => null);
+      if (!j || !r.ok) { alert("Colour-space check failed."); return; }
+      measured += j.measured;
+      if (j.finished) break;
+    }
+    alert(
+      measured === 0
+        ? "Every original on file has already been checked."
+        : `Checked ${measured} original${measured === 1 ? "" : "s"}. Any that are not sRGB now carry a warning in the project editor.`
+    );
+    refreshRef.current();
+  }
+
   async function run() {
     setRunning(true); setDone(0); setFailures([]); setFinished(false); stopRef.current = false;
     let cursor: string | null = null;
@@ -1898,6 +1948,12 @@ function RegeneratePanel() {
           disabled={running}
           className="text-[11px] tracking-[0.2em] uppercase text-white/50 hover:text-white disabled:opacity-40"
         >Re-scan for originals</button>
+        <button
+          onClick={checkColourSpaces}
+          disabled={running}
+          title="Read each original's colour profile. Reads file headers only — it does not re-encode anything."
+          className="text-[11px] tracking-[0.2em] uppercase text-white/50 hover:text-white disabled:opacity-40"
+        >Check colour spaces</button>
       </div>
 
       {(running || done > 0) && (
