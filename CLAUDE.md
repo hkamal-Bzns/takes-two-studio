@@ -72,7 +72,9 @@ if (!checkAdmin(req)) return unauthorized();
 ```
 
 The only routes that are legitimately public: `GET /api/projects`,
-`GET /api/overview`, `GET /api/settings`, `GET /api/media/*`.
+`GET /api/overview`, `GET /api/settings`, `GET /api/media/*`,
+`GET /api/icon/*` (favicons and the web manifest — fetched by the browser
+before anything else, and they reveal nothing).
 
 There is no public write route. `POST /api/inquiries` used to be one, backing
 the contact form; both were removed. Every remaining route that mutates

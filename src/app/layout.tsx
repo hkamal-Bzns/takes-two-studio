@@ -14,25 +14,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "Takes Two Studio — Admin",
+  description: "Content management for the Takes Two Studio portfolio.",
+  // The same generated set the public site uses, so the admin tab carries the
+  // studio's own icon. This previously pointed at a third-party CDN.
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      { url: "/api/icon/favicon.ico", sizes: "16x16 32x32" },
+      { url: "/api/icon/favicon-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: { url: "/api/icon/apple-touch-icon.png", sizes: "180x180" },
   },
-  openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-  },
+  manifest: "/api/icon/site.webmanifest",
+  // A private CMS has no business in a search index.
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

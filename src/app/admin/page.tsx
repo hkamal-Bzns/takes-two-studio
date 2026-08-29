@@ -1614,6 +1614,7 @@ function SiteTab() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
   const originalRef = useRef<string>("");
 
   useEffect(() => {
@@ -1628,6 +1629,29 @@ function SiteTab() {
     };
     load();
   }, []);
+
+  /** Upload a new site icon. The server writes the whole set and records the
+   *  version, so this saves immediately rather than waiting for Save Changes —
+   *  the file is already on disk by the time the response comes back. */
+  async function uploadIcon(file: File) {
+    setUploadingIcon(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch(API("/icon"), { method: "POST", body: fd });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) { alert(j?.error || "Could not use that image."); return; }
+      // Update the stored value without marking the form dirty: it is saved.
+      setSettings(prev => {
+        const next = { ...prev, siteIcon: j.siteIcon };
+        originalRef.current = JSON.stringify(next);
+        setDirty(false);
+        return next;
+      });
+    } finally {
+      setUploadingIcon(false);
+    }
+  }
 
   function set(key: string, value: string) {
     setSettings(prev => {
@@ -1809,11 +1833,77 @@ function SiteTab() {
             consistent. Leave blank for the default of 18px; values are clamped to 10–48.
           </p>
         </Field>
+        <Field label="Site icon (favicon)">
+          <div className="flex items-center gap-4">
+            <img
+              key={settings.siteIcon || "default"}
+              src={`/api/icon/favicon-32.png?v=${settings.siteIcon || "default"}`}
+              alt=""
+              width={32}
+              height={32}
+              className="w-8 h-8 bg-white/5 shrink-0"
+            />
+            <label className={`text-[11px] tracking-[0.2em] uppercase border border-white/30 px-4 py-2 cursor-pointer hover:bg-white hover:text-black transition-colors ${uploadingIcon ? "opacity-40 pointer-events-none" : ""}`}>
+              {uploadingIcon ? "Generating…" : "Upload icon"}
+              <input
+                type="file"
+                accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                className="hidden"
+                onChange={e => e.target.files?.[0] && uploadIcon(e.target.files[0])}
+              />
+            </label>
+          </div>
+          <p className="text-white/30 text-[11px] mt-2">
+            One square image, PNG or SVG, 512×512 or larger. From it the app writes
+            favicon.ico (16 and 32), a 32px PNG, a 180px Apple touch icon, and 192/512
+            icons for the web manifest. Until you upload one, the site keeps the icon it
+            has. A non-square image is fitted rather than cropped, so nothing is cut off.
+          </p>
+        </Field>
         <Field label="Contact eyebrow">
           <input value={settings.contactEyebrow || ""} onChange={e => set("contactEyebrow", e.target.value)} className="adm-field" placeholder="Get in Touch" />
         </Field>
         <Field label="Contact heading (use a period to split into two lines)">
           <input value={settings.contactHeading || ""} onChange={e => set("contactHeading", e.target.value)} className="adm-field" placeholder="For bookings & inquiries." />
+        </Field>
+        <Field label="Bookings 1 — label">
+          <input value={settings.contactBookingsALabel ?? ""} onChange={e => set("contactBookingsALabel", e.target.value)} className="adm-field" placeholder="Bookings — Mohamed" />
+        </Field>
+        <Field label="Bookings 1 — email">
+          <input value={settings.contactBookingsAEmail ?? ""} onChange={e => set("contactBookingsAEmail", e.target.value)} className="adm-field" placeholder="M.medhat@takestwostudio.com" />
+        </Field>
+        <Field label="Bookings 2 — label">
+          <input value={settings.contactBookingsBLabel ?? ""} onChange={e => set("contactBookingsBLabel", e.target.value)} className="adm-field" placeholder="Bookings — Okasha" />
+        </Field>
+        <Field label="Bookings 2 — email">
+          <input value={settings.contactBookingsBEmail ?? ""} onChange={e => set("contactBookingsBEmail", e.target.value)} className="adm-field" placeholder="Okasha@takestwostudio.com" />
+        </Field>
+        <Field label="Cairo — label">
+          <input value={settings.contactCairoLabel ?? ""} onChange={e => set("contactCairoLabel", e.target.value)} className="adm-field" placeholder="Cairo, Egypt" />
+        </Field>
+        <Field label="Cairo — phone numbers (separate with commas)">
+          <input value={settings.contactCairoPhones ?? ""} onChange={e => set("contactCairoPhones", e.target.value)} className="adm-field" placeholder="+20 110 090 0617, +20 114 321 9416" />
+        </Field>
+        <Field label="Riyadh — label">
+          <input value={settings.contactRiyadhLabel ?? ""} onChange={e => set("contactRiyadhLabel", e.target.value)} className="adm-field" placeholder="Riyadh, KSA" />
+        </Field>
+        <Field label="Riyadh — phone numbers (separate with commas)">
+          <input value={settings.contactRiyadhPhones ?? ""} onChange={e => set("contactRiyadhPhones", e.target.value)} className="adm-field" placeholder="+966 56 742 2977" />
+        </Field>
+        <Field label="WhatsApp number">
+          <input value={settings.contactWhatsapp ?? ""} onChange={e => set("contactWhatsapp", e.target.value)} className="adm-field" placeholder="+966 56 742 2977" />
+          <p className="text-white/30 text-[11px] mt-1">
+            Shown as the WhatsApp link under the Riyadh numbers. Clear it to hide the link.
+          </p>
+        </Field>
+        <Field label="Studio Management — label">
+          <input value={settings.contactManagementLabel ?? ""} onChange={e => set("contactManagementLabel", e.target.value)} className="adm-field" placeholder="Studio Management" />
+        </Field>
+        <Field label="Studio Management — name">
+          <input value={settings.contactManagementName ?? ""} onChange={e => set("contactManagementName", e.target.value)} className="adm-field" placeholder="Hazem Kamal" />
+        </Field>
+        <Field label="Studio Management — email">
+          <input value={settings.contactManagementEmail ?? ""} onChange={e => set("contactManagementEmail", e.target.value)} className="adm-field" placeholder="Hazem@takestwostudio.com" />
         </Field>
       </div>
 
