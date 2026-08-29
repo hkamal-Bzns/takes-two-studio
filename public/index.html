@@ -121,7 +121,12 @@
       justify-content: space-between;
       gap: 1rem;
       padding: 0.6rem 1.25rem;
+      /* iOS/WebKit: the radius, the clip and the backdrop-filter must all sit on
+         the SAME element, or the blur paints as an unclipped rectangle. */
       border-radius: 9999px;
+      overflow: hidden;
+      isolation: isolate;      /* own stacking context = own backdrop root */
+      transform: translateZ(0); /* force a composited layer for the blur */
       background: var(--bar-bg);
       backdrop-filter: blur(16px) saturate(140%);
       -webkit-backdrop-filter: blur(16px) saturate(140%);
@@ -243,6 +248,42 @@
     /* ---------- Mobile menu ---------- */
     .mobile-menu { max-height:0; overflow:hidden; transition:max-height .5s var(--ease); }
     .mobile-menu.open { max-height:520px; }
+    /* The collapsed menu is the iOS bug: max-height:0 + overflow:hidden collapses
+       the panel's box, but WebKit still paints its backdrop-filter at full size —
+       a large blurred rectangle below the header, over the hero. So the blur only
+       exists while the menu is actually open. */
+    .mobile-menu-panel {
+      border-radius: 1rem;
+      overflow: hidden;
+      isolation: isolate;
+      transform: translateZ(0);
+    }
+    .mobile-menu.open .mobile-menu-panel {
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    /* The click-catching scrim is position:fixed, so the collapsed menu's
+       overflow:hidden does not clip it — keep it out of the render until open. */
+    #mobile-menu-backdrop { display: none; }
+    .mobile-menu.open #mobile-menu-backdrop { display: block; }
+    /* iOS fallback: WebKit still can't composite the bar's backdrop-filter without
+       artefacts, so drop the blur there and lean on a near-solid bar instead.
+       Same selectors as the theme blocks above, later in source, so they win. */
+    @supports (-webkit-touch-callout: none) {
+      html[data-theme="dark"] {
+        --bar-bg: rgba(20, 20, 22, 0.95);
+        --bar-bg-scrolled: rgba(20, 20, 22, 0.97);
+      }
+      html[data-theme="light"] {
+        --bar-bg: rgba(35, 35, 38, 0.95);
+        --bar-bg-scrolled: rgba(35, 35, 38, 0.97);
+      }
+      .floating-bar,
+      .mobile-menu.open .mobile-menu-panel {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+      }
+    }
 
     ::-webkit-scrollbar { width:8px; height:8px; }
     ::-webkit-scrollbar-track { background:var(--bg); }
@@ -293,7 +334,7 @@
       <!-- Mobile menu (floating dropdown below the bar — dark grey to match the bar) -->
       <div id="mobile-menu" class="mobile-menu md:hidden" style="max-width:1280px; margin:0 auto; position:relative; z-index:60;">
         <div id="mobile-menu-backdrop" onclick="closeMobileMenu()" style="position:fixed; top:0; left:0; right:0; bottom:0; z-index:59; background:rgba(0,0,0,0.3);"></div>
-        <div class="mt-2 rounded-2xl border overflow-hidden" style="background: var(--bar-bg-scrolled); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-color: var(--bar-border); position:relative; z-index:61;">
+        <div class="mobile-menu-panel mt-2 rounded-2xl border overflow-hidden" style="background: var(--bar-bg-scrolled); border-color: var(--bar-border); position:relative; z-index:61;">
           <div id="mobile-nav" class="px-6 py-4 flex flex-col text-[12px] tracking-[0.22em] uppercase font-light items-end text-right" style="color:#fff; position:relative; z-index:62;"></div>
         </div>
       </div>
