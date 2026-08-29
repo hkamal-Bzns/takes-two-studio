@@ -67,6 +67,17 @@ type Project = {
   overview: boolean;
   createdAt: string;
   images: Image[];
+  // Where the cover is cropped around, in percent. Always present — the column
+  // is NOT NULL and defaults to the 50/50 centre.
+  focusX: number;
+  focusY: number;
+  // Optional tall crop for the hero on upright phones, with its own
+  // derivatives. Null on almost every project.
+  portraitImage: string | null;
+  portraitSrcsetAvif: string | null;
+  portraitSrcsetWebp: string | null;
+  portraitWidth: number | null;
+  portraitHeight: number | null;
 } & Derivatives;
 type Inquiry = {
   id: string;
@@ -102,6 +113,10 @@ type OverviewItem = {
   projectId: string | null;
   caption: string | null;
   order: number;
+  // The homepage grid crops these to 4/3 exactly as the category grids crop a
+  // project cover, so they carry the same focal point. NOT NULL, default 50.
+  focusX: number;
+  focusY: number;
 } & Derivatives;
 
 const API = (p: string) => `/api${p}`;
@@ -529,7 +544,7 @@ function SortableProjectCard({ p, index, onEdit, onRemove, onToggleOverview, onT
         className="flex-shrink-0 self-stretch px-1 text-white/30 hover:text-white/80 cursor-grab active:cursor-grabbing touch-none"
       >⠿</button>
       <span className="flex-shrink-0 self-start text-[10px] text-white/30 font-mono pt-1 w-6 text-right">{String(index + 1).padStart(2, "0")}</span>
-      <img src={thumbUrl(p.coverImage, p.srcsetWebp, p.srcsetAvif)} alt={p.title} loading="lazy" decoding="async" width={80} height={80} className="w-20 h-20 object-cover flex-shrink-0 bg-white/5" draggable={false} />
+      <img src={thumbUrl(p.coverImage, p.srcsetWebp, p.srcsetAvif)} alt={p.title} loading="lazy" decoding="async" width={80} height={80} className="w-20 h-20 object-cover flex-shrink-0 bg-white/5" draggable={false} style={{ objectPosition: `${p.focusX ?? 50}% ${p.focusY ?? 50}%` }} />
       <div className="flex-1 min-w-0">
         <h3 className="font-serif text-lg truncate flex items-center gap-2 flex-wrap">
           {p.title}
@@ -606,6 +621,15 @@ function OverviewTab() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ projectId }),
+    });
+    refreshRef.current();
+  }
+
+  async function setFocus(id: string, focusX: number, focusY: number) {
+    await fetch(API(`/overview/${id}`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ focusX, focusY }),
     });
     refreshRef.current();
   }
@@ -744,7 +768,7 @@ function OverviewTab() {
             <SortableContext items={items.map(i => i.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {items.map((item, i) => (
-                  <SortableOverviewItem key={item.id} item={item} index={i} onRemove={removeItem} allProjects={allProjects} onLinkProject={linkProject} />
+                  <SortableOverviewItem key={item.id} item={item} index={i} onRemove={removeItem} allProjects={allProjects} onLinkProject={linkProject} onSetFocus={setFocus} />
                 ))}
               </div>
             </SortableContext>
@@ -755,9 +779,14 @@ function OverviewTab() {
   );
 }
 
-function SortableOverviewItem({ item, index, onRemove, allProjects, onLinkProject }: { item: OverviewItem; index: number; onRemove: (id: string) => void; allProjects: Project[]; onLinkProject: (id: string, projectId: string | null) => void }) {
+function SortableOverviewItem({ item, index, onRemove, allProjects, onLinkProject, onSetFocus }: { item: OverviewItem; index: number; onRemove: (id: string) => void; allProjects: Project[]; onLinkProject: (id: string, projectId: string | null) => void; onSetFocus: (id: string, x: number, y: number) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const [showLinker, setShowLinker] = useState(false);
+  // The tile is a ~100px square in a drag-and-drop grid — far too small for the
+  // picker and its crop previews, so it opens over the page instead.
+  const [showFocus, setShowFocus] = useState(false);
+  const [draft, setDraft] = useState<[number, number]>([item.focusX ?? 50, item.focusY ?? 50]);
+  const focusSet = (item.focusX ?? 50) !== 50 || (item.focusY ?? 50) !== 50;
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -768,7 +797,7 @@ function SortableOverviewItem({ item, index, onRemove, allProjects, onLinkProjec
   const linkedProject = allProjects.find(p => p.id === item.projectId);
   return (
     <div ref={setNodeRef} style={style} className="relative group select-none" {...attributes} {...listeners}>
-      <img src={thumbUrl(item.url, item.srcsetWebp, item.srcsetAvif)} alt={item.caption || ""} loading="lazy" decoding="async" className="w-full aspect-square object-cover bg-white/5 pointer-events-none" draggable={false} />
+      <img src={thumbUrl(item.url, item.srcsetWebp, item.srcsetAvif)} alt={item.caption || ""} loading="lazy" decoding="async" className="w-full aspect-square object-cover bg-white/5 pointer-events-none" draggable={false} style={{ objectPosition: `${item.focusX ?? 50}% ${item.focusY ?? 50}%` }} />
       <span className="absolute top-1 left-1 bg-black/70 text-white/80 text-[9px] w-5 h-5 flex items-center justify-center pointer-events-none">{String(index + 1).padStart(2, "0")}</span>
       <span className="absolute top-1 left-7 bg-black/70 text-white/50 text-[9px] px-1 h-5 flex items-center pointer-events-none">⠿</span>
       {/* No derivatives resolved for this url — it renders as one flat file. */}
@@ -783,6 +812,12 @@ function SortableOverviewItem({ item, index, onRemove, allProjects, onLinkProjec
         onPointerDown={(e) => e.stopPropagation()}
         className="absolute top-1 right-1 bg-black/70 text-white w-6 h-6 text-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
       >×</button>
+      <button
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setDraft([item.focusX ?? 50, item.focusY ?? 50]); setShowFocus(true); }}
+        onPointerDown={(e) => e.stopPropagation()}
+        title={focusSet ? `Focal point: ${item.focusX}% / ${item.focusY}%` : "Set the focal point the grid crops around"}
+        className={`absolute top-1 right-8 bg-black/70 w-6 h-6 text-xs transition-opacity z-10 ${focusSet ? "text-sky-300 opacity-100" : "text-white opacity-0 group-hover:opacity-100"}`}
+      >◎</button>
       {/* Link-to-project indicator + control */}
       {item.projectId ? (
         <span className="absolute bottom-0 left-0 right-0 bg-sky-500/80 text-white text-[8px] px-1 py-0.5 truncate pointer-events-none" title={linkedProject?.title}>↗ {linkedProject?.title || "Linked"}</span>
@@ -810,6 +845,37 @@ function SortableOverviewItem({ item, index, onRemove, allProjects, onLinkProjec
           <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowLinker(false); }} className="text-white/50 text-[9px] mt-1 hover:text-white">Close</button>
         </div>
       )}
+      {showFocus && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6"
+          onClick={(e) => { e.stopPropagation(); setShowFocus(false); }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div
+            className="bg-neutral-950 border border-white/15 p-5 max-w-2xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-4">Focal Point</p>
+            <FocusPicker
+              src={thumbUrl(item.url, item.srcsetWebp, item.srcsetAvif)}
+              x={draft[0]}
+              y={draft[1]}
+              onChange={(nx, ny) => setDraft([nx, ny])}
+              hint="Click the subject. The homepage grid crops to the first shape."
+            />
+            <div className="flex gap-4 items-center mt-5">
+              <button
+                onClick={() => { onSetFocus(item.id, draft[0], draft[1]); setShowFocus(false); }}
+                className="border border-white/30 px-5 py-2 text-[10px] tracking-[0.3em] uppercase hover:bg-white hover:text-black transition-colors"
+              >Save</button>
+              <button
+                onClick={() => setShowFocus(false)}
+                className="text-white/50 text-[10px] tracking-[0.2em] uppercase hover:text-white"
+              >Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -824,6 +890,22 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
   const [published, setPublished] = useState(project?.published ?? true);
   const [featured, setFeatured] = useState(project?.featured ?? false);
   const [overview, setOverview] = useState(project?.overview ?? false);
+  const [focusX, setFocusX] = useState(project?.focusX ?? 50);
+  const [focusY, setFocusY] = useState(project?.focusY ?? 50);
+  // The optional portrait crop, held in the same shape an upload returns so it
+  // can be dropped straight into the save body. Null means there isn't one.
+  const [portrait, setPortrait] = useState<Uploaded | null>(
+    project?.portraitImage
+      ? {
+          url: project.portraitImage,
+          srcsetAvif: project.portraitSrcsetAvif,
+          srcsetWebp: project.portraitSrcsetWebp,
+          width: project.portraitWidth,
+          height: project.portraitHeight,
+        }
+      : null
+  );
+  const [uploadingPortrait, setUploadingPortrait] = useState(false);
   const [images, setImages] = useState<Image[]>(project?.images || []);
   // Uploaded but not yet attached — see STAGED_PREFIX. Normally empty when
   // editing an existing project; also holds the survivors when an attach
@@ -868,6 +950,15 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
     const body = {
       title, category, coverImage, description, order, published, featured, overview,
       ...(coverDerivatives ?? { srcsetAvif: null, srcsetWebp: null, width: null, height: null }),
+      focusX, focusY,
+      // Sent as a set every time, nulls included: that is what removes a
+      // portrait crop, and it keeps the derivatives from outliving the image
+      // they describe.
+      portraitImage: portrait?.url ?? null,
+      portraitSrcsetAvif: portrait?.srcsetAvif ?? null,
+      portraitSrcsetWebp: portrait?.srcsetWebp ?? null,
+      portraitWidth: portrait?.width ?? null,
+      portraitHeight: portrait?.height ?? null,
     };
     const url = pid ? API(`/projects/${pid}`) : API("/projects");
     const method = pid ? "PATCH" : "POST";
@@ -879,6 +970,19 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
     }
     const j = await r.json();
     return j.project.id;
+  }
+
+  /**
+   * The portrait crop goes through the same pipeline as everything else — same
+   * untouched master, same AVIF/WebP rungs. It is deliberately not attached as
+   * a gallery image: it is a second crop of a photograph the gallery already
+   * shows, and exhibiting it twice is not what it is for.
+   */
+  async function uploadPortrait(file: File) {
+    setUploadingPortrait(true);
+    const u = await postUpload(file);
+    setUploadingPortrait(false);
+    if (u) setPortrait(u);
   }
 
   /** Uploads always become gallery images now — a cover is chosen from them. */
@@ -1118,6 +1222,70 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
             </div>
           </Field>
 
+          {/* Focal point. Only offered once there is a cover to point at — the
+              control is a picture you click, so without one there is nothing
+              to click. */}
+          {coverImage && (
+            <Field label="Focal Point">
+              <FocusPicker
+                src={thumbUrl(coverImage, coverDerivatives?.srcsetWebp, coverDerivatives?.srcsetAvif)}
+                x={focusX}
+                y={focusY}
+                onChange={(nx, ny) => { setFocusX(nx); setFocusY(ny); }}
+              />
+            </Field>
+          )}
+
+          {/* An optional tall crop, for the one place a landscape cover suffers
+              most: the full-height hero on a phone held upright. */}
+          {coverImage && (
+            <Field label="Portrait Crop (optional)">
+              <div className="flex gap-3 items-start">
+                {portrait ? (
+                  <>
+                    <img
+                      src={thumbUrl(portrait.url, portrait.srcsetWebp, portrait.srcsetAvif)}
+                      alt="portrait crop" loading="lazy" decoding="async"
+                      className="w-20 object-cover bg-white/5 flex-shrink-0"
+                      style={{ aspectRatio: "9 / 17" }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white/60 text-sm">Used by the slideshow on phones held upright.</p>
+                      {portrait.width && portrait.height && (
+                        <p className="text-white/30 text-[11px] mt-1 tabular-nums">
+                          {portrait.width} × {portrait.height}
+                          {portrait.width >= portrait.height &&
+                            " — wider than it is tall, which is the shape this exists to avoid."}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => setPortrait(null)}
+                        className="mt-2 text-[10px] tracking-[0.2em] uppercase text-white/50 hover:text-red-400"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-white/50 text-sm flex-1">
+                    None. Phones use the landscape cover, cropped around the focal point above.
+                  </p>
+                )}
+              </div>
+              <input
+                type="file" accept="image/*" disabled={uploadingPortrait}
+                onChange={e => { const f = e.target.files?.[0]; if (f) uploadPortrait(f); e.target.value = ""; }}
+                className="text-[10px] text-white/50 mt-3"
+              />
+              {uploadingPortrait && <p className="text-white/50 text-xs mt-1">Uploading…</p>}
+              {!featured && (
+                <p className="text-white/35 text-[11px] mt-2">
+                  This project is not in the slideshow, so a portrait crop would not be shown yet.
+                </p>
+              )}
+            </Field>
+          )}
+
           <button onClick={handleSave} disabled={saving || uploading}
             className="border border-white/30 px-6 py-3 text-[11px] tracking-[0.3em] uppercase hover:bg-white hover:text-black transition-colors disabled:opacity-50">
             {saving ? (progress ?? "Saving…") : pid ? "Update Project" : "Create Project"}
@@ -1192,6 +1360,120 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="block text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">{label}</label>
       {children}
+    </div>
+  );
+}
+
+/* ---------------- Focal point picker ----------------
+ *
+ * Click the picture where the subject is. Stored as percentages rather than
+ * pixels so the value survives a re-upload at a different resolution, and
+ * because percentages are exactly what `object-position` takes on the public
+ * site — no conversion between what is set here and what is painted there.
+ *
+ * The two boxes on the right are the point of the control. The site crops every
+ * cover twice, to different shapes, and neither crop is visible while looking
+ * at the whole photograph — which is how subjects ended up cut off in the first
+ * place. They show what each crop actually keeps, live.
+ */
+const CROP_PREVIEWS = [
+  // The category and homepage grids: .masonry-item.gallery-item is aspect-ratio 4/3.
+  { label: "Grid", ratio: "4 / 3" },
+  // A phone hero at 85svh. Roughly 9/17 on a modern handset — the tall crop
+  // that a landscape photograph suffers most from.
+  { label: "Phone hero", ratio: "9 / 17" },
+] as const;
+
+function FocusPicker({
+  src,
+  x,
+  y,
+  onChange,
+  hint,
+}: {
+  src: string;
+  x: number;
+  y: number;
+  onChange: (x: number, y: number) => void;
+  hint?: string;
+}) {
+  const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
+
+  function pick(e: React.MouseEvent<HTMLDivElement>) {
+    // getBoundingClientRect, not offsetX/offsetY: the marker sits inside this
+    // box and would report coordinates relative to itself when clicked.
+    const r = e.currentTarget.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    onChange(clamp(((e.clientX - r.left) / r.width) * 100), clamp(((e.clientY - r.top) / r.height) * 100));
+  }
+
+  // Arrow keys nudge by one percent, which is finer than a click can land and
+  // is the only way to reach an exact edge value.
+  function nudge(e: React.KeyboardEvent<HTMLDivElement>) {
+    const step = e.shiftKey ? 10 : 1;
+    const moves: Record<string, [number, number]> = {
+      ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
+    };
+    const m = moves[e.key];
+    if (!m) return;
+    e.preventDefault();
+    onChange(clamp(x + m[0]), clamp(y + m[1]));
+  }
+
+  const position = `${x}% ${y}%`;
+  const isDefault = x === 50 && y === 50;
+
+  return (
+    <div className="flex gap-4 items-start flex-wrap">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Focal point, ${x}% from the left and ${y}% from the top. Click the subject, or use the arrow keys.`}
+        onClick={pick}
+        onKeyDown={nudge}
+        className="relative cursor-crosshair bg-white/5 flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-white/50"
+        style={{ width: 260, maxWidth: "100%" }}
+      >
+        {/* object-contain, not cover: this is the one place the whole frame has
+            to be visible, because a point can only be chosen from what is
+            shown. The previews beside it do the cropping. */}
+        <img src={src} alt="" draggable={false} className="w-full max-h-56 object-contain select-none pointer-events-none" />
+        <span
+          aria-hidden
+          className="absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-full border-2 border-white pointer-events-none"
+          style={{ left: `${x}%`, top: `${y}%`, boxShadow: "0 0 0 2px rgba(0,0,0,0.65), inset 0 0 0 2px rgba(0,0,0,0.45)" }}
+        />
+      </div>
+
+      <div className="flex gap-3 items-start">
+        {CROP_PREVIEWS.map(p => (
+          <div key={p.label}>
+            <div className="bg-white/5 overflow-hidden" style={{ width: 78, aspectRatio: p.ratio }}>
+              <img
+                src={src}
+                alt=""
+                draggable={false}
+                className="w-full h-full object-cover select-none"
+                style={{ objectPosition: position }}
+              />
+            </div>
+            <p className="text-white/40 text-[9px] tracking-[0.2em] uppercase mt-1.5">{p.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="text-[11px] text-white/50 min-w-[9rem]">
+        <p className="tabular-nums">{x}% / {y}%{isDefault ? " — centre" : ""}</p>
+        <p className="mt-1 text-white/35">{hint ?? "Click the subject. Arrow keys nudge, Shift for 10%."}</p>
+        {!isDefault && (
+          <button
+            onClick={() => onChange(50, 50)}
+            className="mt-2 text-[10px] tracking-[0.2em] uppercase text-white/50 hover:text-white underline underline-offset-4"
+          >
+            Reset to centre
+          </button>
+        )}
+      </div>
     </div>
   );
 }

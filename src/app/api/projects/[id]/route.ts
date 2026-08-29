@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAdmin } from "@/lib/auth";
-import { pickDerivatives } from "@/lib/images";
+import { pickDerivatives, pickFocus, pickPortrait } from "@/lib/images";
 
 /**
  * GET /api/projects/[id]            — public, single project + images
@@ -35,6 +35,20 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   // so re-uploading a non-pipeline image clears stale derivative data.
   if ("coverImage" in body || "srcsetAvif" in body) {
     Object.assign(data, pickDerivatives(body));
+  }
+  // The focal point is clamped rather than trusted — it is interpolated into a
+  // CSS declaration on the public site. Only touched when the caller actually
+  // sends it, so a save from a screen that knows nothing about focal points
+  // cannot quietly reset a chosen one back to the centre.
+  if ("focusX" in body || "focusY" in body) {
+    const focus = pickFocus(body);
+    if ("focusX" in body) data.focusX = focus.focusX;
+    if ("focusY" in body) data.focusY = focus.focusY;
+  }
+  // The portrait crop travels as a set: `portraitImage: null` removes it and
+  // takes its now-orphaned derivatives with it.
+  if ("portraitImage" in body) {
+    Object.assign(data, pickPortrait(body));
   }
   const project = await db.project.update({ where: { id }, data });
   return NextResponse.json({ project });

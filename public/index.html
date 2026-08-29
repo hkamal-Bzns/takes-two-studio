@@ -225,6 +225,33 @@
     .hero-progress.run { animation: progress 5s linear forwards; }
     @keyframes progress { from { width:0; } to { width:100%; } }
 
+    /* ---------- Hero on an upright phone ----------
+       A landscape photograph in a portrait viewport is mostly crop, and that
+       crop is what was cutting subjects in half. The condition here is the same
+       one PORTRAIT_MEDIA uses to switch <picture> to the portrait upload, and
+       the two must stay identical — otherwise a slide gets the portrait file
+       with the landscape layout, or the reverse. */
+    @media (max-width: 767px) and (orientation: portrait) {
+      /* svh, not vh: vh is sized for the *expanded* browser chrome, so a
+         100vh hero on iOS is taller than the screen until the toolbar
+         collapses. The vh line is the fallback for browsers without svh —
+         still shorter than it was, just measured against the larger box. */
+      .hero-slideshow { height:85vh; height:85svh; min-height:440px; }
+      /* Drop the 108% overflow and the drift that needs it. Two reasons: the
+         focal point then lands exactly where it was set instead of 4% off, and
+         a portrait upload is shown whole rather than losing 8% of its width to
+         a pan nobody can see on a phone. */
+      .hero-slide img { width:100%; transform:none; }
+      .hero-slide.active img,
+      .hero-slide.active:nth-child(odd) img { animation:none; }
+      /* Less of the frame is visible here, so the scrim takes less of it. */
+      .hero-overlay { background:linear-gradient(180deg, rgba(10,10,10,0.20) 0%, rgba(10,10,10,0) 28%, rgba(10,10,10,0) 58%, rgba(10,10,10,0.55) 100%); }
+      /* The middle of that gradient is fully transparent and the title sits in
+         it, so the lightening cannot be paid for out of the text's contrast.
+         The type gets its own shadow instead of leaning on the overlay. */
+      .hero-content { text-shadow:0 1px 20px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.45); }
+    }
+
     /* ---------- Lightbox ---------- */
     .lightbox { opacity:0; pointer-events:none; transition:opacity .45s var(--ease); overflow:hidden; }
     .lightbox.open { opacity:1; pointer-events:auto; }
@@ -738,6 +765,9 @@
             srcsetAvif: p.srcsetAvif, srcsetWebp: p.srcsetWebp,
             width: p.width, height: p.height,
             sizes: SIZES.cover,
+            // The grid cell is a fixed 4/3 box, so every cover here is cropped
+            // and the focal point is what decides which part survives.
+            focusX: p.focusX, focusY: p.focusY,
             eager: i < 4,
             className: 'w-full h-full block object-cover'
           })}
@@ -785,10 +815,37 @@
          under-states the real display width, which can make the browser pick
          one rung below what it ends up painting. */
       hero:    '108vw',
+      /* An upright phone drops the 108% overflow (see the hero media query),
+         so the portrait slide really is displayed at exactly 100vw. */
+      heroPortrait: '100vw',
       cover:   '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw',
       project: '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw',
       logo:    '140px'
     };
+
+    /* When a portrait crop, if one exists, should be used instead of the
+       landscape cover. Kept next to the CSS rule it mirrors — the media query
+       in the hero block scopes its layout changes to exactly this condition,
+       and the two must not drift apart. */
+    const PORTRAIT_MEDIA = '(max-width: 767px) and (orientation: portrait)';
+
+    /* Where the subject sits, as an object-position declaration.
+       Clamped rather than trusted: these arrive over the network and end up
+       inside a style attribute. 50/50 returns the empty string, so the
+       overwhelming majority of images carry no inline style at all and the
+       stylesheet keeps control of them. */
+    function focusStyle(x, y) {
+      const pct = v => {
+        // null and '' have to be caught before Number(), which turns both into
+        // 0 — a valid percentage, and the top-left corner. A missing focal
+        // point must land in the middle, not the corner.
+        if (v === null || v === undefined || v === '') return 50;
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 50;
+      };
+      const fx = pct(x), fy = pct(y);
+      return (fx === 50 && fy === 50) ? '' : `object-position:${fx}% ${fy}%`;
+    }
 
     /* Pull the widest entry out of a srcset — used by the lightbox, which
        always wants maximum quality regardless of viewport. */
@@ -819,20 +876,40 @@
     }
 
     /* Builds a <picture>. If o.srcsetAvif / o.srcsetWebp are absent it degrades
-       to a plain <img> with the original src — so this works on today's data. */
+       to a plain <img> with the original src — so this works on today's data.
+
+       o.portrait, when set, is a second image for upright phones:
+         { src, srcsetAvif?, srcsetWebp?, sizes?, media? }
+       o.focusX / o.focusY move the crop off centre. Both are optional and both
+       are inert at their defaults. */
     function pictureHTML(src, o) {
       o = o || {};
       const sizes = escapeAttr(o.sizes || '100vw');
       const dims = (o.width && o.height)
         ? ` width="${Number(o.width)}" height="${Number(o.height)}"` : '';
       let sources = '';
+      /* The portrait crop goes first. <source> selection stops at the first
+         element whose media and type both match, so anything emitted after the
+         landscape sources would never be reached on a phone that supports
+         AVIF — which is all of them. */
+      if (o.portrait && o.portrait.src) {
+        const pmedia = escapeAttr(o.portrait.media || PORTRAIT_MEDIA);
+        const psizes = escapeAttr(o.portrait.sizes || '100vw');
+        if (o.portrait.srcsetAvif) sources += `<source media="${pmedia}" type="image/avif" srcset="${escapeAttr(o.portrait.srcsetAvif)}" sizes="${psizes}">`;
+        if (o.portrait.srcsetWebp) sources += `<source media="${pmedia}" type="image/webp" srcset="${escapeAttr(o.portrait.srcsetWebp)}" sizes="${psizes}">`;
+        /* The portrait file itself, untyped, as the last portrait candidate.
+           Without it a portrait upload whose derivatives are missing would fall
+           through to the landscape <img> — the exact crop being avoided. */
+        sources += `<source media="${pmedia}" srcset="${escapeAttr(o.portrait.src)}">`;
+      }
       if (o.srcsetAvif) sources += `<source type="image/avif" srcset="${escapeAttr(o.srcsetAvif)}" sizes="${sizes}">`;
       if (o.srcsetWebp) sources += `<source type="image/webp" srcset="${escapeAttr(o.srcsetWebp)}" sizes="${sizes}">`;
+      const style = [o.style, focusStyle(o.focusX, o.focusY)].filter(Boolean).join(';');
       return `<picture>${sources}<img src="${escapeAttr(src)}" alt="${escapeAttr(o.alt || '')}"${dims}` +
              ` loading="${o.eager ? 'eager' : 'lazy'}" decoding="async"` +
              (o.eager ? ' fetchpriority="high"' : '') +
              (o.className ? ` class="${escapeAttr(o.className)}"` : '') +
-             (o.style ? ` style="${escapeAttr(o.style)}"` : '') + ` /></picture>`;
+             (style ? ` style="${escapeAttr(style)}"` : '') + ` /></picture>`;
     }
 
     /* ---------- Routing ----------
@@ -935,6 +1012,9 @@
           featured: false,
           overview: true,
           createdAt: '',
+          // Overview items carry their own focal point — the homepage grid
+          // crops them to the same 4/3 box the category grids use.
+          focusX: it.focusX, focusY: it.focusY,
           images: [{ id: it.id, url: it.url, caption: it.caption, order: 0, projectId: it.projectId }],
           _projectId: it.projectId,
         }));
@@ -986,6 +1066,15 @@
           srcsetAvif: p.srcsetAvif, srcsetWebp: p.srcsetWebp,
           width: p.width, height: p.height,
           sizes: SIZES.hero,
+          focusX: p.focusX, focusY: p.focusY,
+          // Only present on projects the studio has given a tall crop; every
+          // other slide falls back to the landscape cover and its focal point.
+          portrait: p.portraitImage ? {
+            src: p.portraitImage,
+            srcsetAvif: p.portraitSrcsetAvif,
+            srcsetWebp: p.portraitSrcsetWebp,
+            sizes: SIZES.heroPortrait
+          } : null,
           eager: i === 0
         });
         // clicking a hero slide opens the lightbox (full-size popup with next/prev)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAdmin } from "@/lib/auth";
-import { pickDerivatives } from "@/lib/images";
+import { pickDerivatives, pickFocus, pickPortrait } from "@/lib/images";
 
 /**
  * GET /api/projects?category=advertising
@@ -78,6 +78,10 @@ export async function POST(req: NextRequest) {
       // Derivatives for coverImage, when the caller uploaded through the
       // pipeline. All null when it didn't — coverImage still renders.
       ...pickDerivatives(body),
+      // Centre crop unless the caller nominated a focal point.
+      ...pickFocus(body),
+      // The optional tall crop for the hero on upright phones.
+      ...pickPortrait(body),
     },
   });
   return NextResponse.json({ project }, { status: 201 });

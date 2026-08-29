@@ -365,6 +365,69 @@ export function pickMaster(body: unknown): MasterFields {
   return url ? { masterUrl: url, masterBytes: bytes } : { masterUrl: null, masterBytes: null };
 }
 
+/**
+ * Where the subject sits in an image, in percent from the top-left.
+ *
+ * Written straight into an `object-position` declaration, so the range has to
+ * be closed here rather than trusted: anything absent, out of range or not a
+ * number becomes the 50/50 centre crop, which is what every row did before
+ * focal points existed. Rounded to whole percent — the picker cannot express
+ * more than that and a fraction only makes the attribute longer.
+ */
+export type FocusFields = { focusX: number; focusY: number };
+
+export function pickFocus(body: unknown, fallback?: Partial<FocusFields>): FocusFields {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const pct = (v: unknown, dflt: number) => {
+    const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+    if (!Number.isFinite(n)) return dflt;
+    return Math.min(100, Math.max(0, Math.round(n)));
+  };
+  return {
+    focusX: pct(b.focusX, fallback?.focusX ?? 50),
+    focusY: pct(b.focusY, fallback?.focusY ?? 50),
+  };
+}
+
+/**
+ * The optional portrait crop of a cover and its derivatives.
+ *
+ * Same all-or-nothing rule as pickMaster: derivatives without an image are
+ * meaningless, so a missing `portraitImage` clears the lot. That is also how
+ * the admin removes a portrait crop — it sends portraitImage: null.
+ */
+export type PortraitFields = {
+  portraitImage: string | null;
+  portraitSrcsetAvif: string | null;
+  portraitSrcsetWebp: string | null;
+  portraitWidth: number | null;
+  portraitHeight: number | null;
+};
+
+const NO_PORTRAIT: PortraitFields = {
+  portraitImage: null,
+  portraitSrcsetAvif: null,
+  portraitSrcsetWebp: null,
+  portraitWidth: null,
+  portraitHeight: null,
+};
+
+export function pickPortrait(body: unknown): PortraitFields {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" && v.trim() !== "" ? v : null);
+  const num = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+  const image = str(b.portraitImage);
+  if (!image) return { ...NO_PORTRAIT };
+  return {
+    portraitImage: image,
+    portraitSrcsetAvif: str(b.portraitSrcsetAvif),
+    portraitSrcsetWebp: str(b.portraitSrcsetWebp),
+    portraitWidth: num(b.portraitWidth),
+    portraitHeight: num(b.portraitHeight),
+  };
+}
+
 /* ---------------------------------------------------------------------------
  * Colour space of a master
  *

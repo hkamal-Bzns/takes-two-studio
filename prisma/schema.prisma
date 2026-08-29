@@ -40,6 +40,23 @@ model Project {
   width       Int?     // master pixel width, for aspect-ratio boxes
   height      Int?     // master pixel height
 
+  // Where the subject sits in the cover, in percent. Used as object-position
+  // everywhere the cover is cropped — the hero slideshow and the category
+  // grids — so a tall viewport keeps the subject instead of the middle.
+  // 50/50 is the centre crop every row had before this existed.
+  focusX      Int      @default(50)
+  focusY      Int      @default(50)
+
+  // An optional second crop of the same photograph, tall, for the hero on a
+  // phone held upright. Null on almost every row, and null is the normal case:
+  // the landscape cover with its focal point is the fallback. Carries its own
+  // derivatives because it goes through the same upload pipeline.
+  portraitImage      String?
+  portraitSrcsetAvif String?
+  portraitSrcsetWebp String?
+  portraitWidth      Int?
+  portraitHeight     Int?
+
   @@index([category])
 }
 
@@ -135,6 +152,11 @@ model OverviewItem {
   caption   String?
   order     Int      @default(0)
   createdAt DateTime @default(now())
+
+  // Same focal point as Project.focusX/focusY, for the same reason: the
+  // homepage grid crops these to a fixed ratio.
+  focusX    Int      @default(50)
+  focusY    Int      @default(50)
 }
 
 // Behind-the-scenes (BTS) videos
