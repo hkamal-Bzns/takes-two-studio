@@ -452,7 +452,7 @@
             <h2 id="clients-heading" class="font-serif text-4xl md:text-6xl leading-tight t-text">Our <em>Clients</em></h2>
             <p id="clients-subtext" class="t-text-faint text-sm mt-6 max-w-md mx-auto font-light">Brands and publications we've had the privilege of creating with.</p>
           </div>
-          <div id="clients-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-px bg-white/5 border border-white/5 reveal" style="transition-delay:0.1s;"></div>
+          <div id="clients-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-px bg-white/5 border border-white/5 reveal" style="transition-delay:0.1s;"></div>
         </div>
       </section>
 
@@ -624,6 +624,17 @@
       });
     }
 
+    /* Clients grid text size, set in the admin panel (Site -> Clients font size).
+       Stored as a plain number of px in siteSettings.clientsFontSize. Anything
+       missing or unparseable falls back to the default, and the value is
+       clamped so a stray entry cannot blow the grid apart. */
+    const CLIENTS_FONT_SIZE_DEFAULT = 18;
+    function clientsFontSize() {
+      const raw = parseFloat(siteSettings.clientsFontSize);
+      if (!Number.isFinite(raw)) return CLIENTS_FONT_SIZE_DEFAULT;
+      return Math.min(48, Math.max(10, raw));
+    }
+
     function renderClients() {
       const grid = document.getElementById('clients-grid');
       if (!grid) return;
@@ -632,18 +643,22 @@
         grid.innerHTML = '<p class="col-span-full text-center t-text-faint py-12 text-sm tracking-[0.2em] uppercase">Clients coming soon.</p>';
         return;
       }
+      // Name-only clients use the admin-set size; logos scale with it too, so
+      // one control keeps the two kinds of cell visually consistent.
+      const fs = clientsFontSize();
       siteClients.forEach(c => {
         const cell = document.createElement('div');
-        cell.className = 'bg-[#0a0a0a] flex items-center justify-center p-8 md:p-12 min-h-[140px]';
+        cell.className = 'bg-[#0a0a0a] flex items-center justify-center p-4 md:p-6 min-h-[72px] md:min-h-[84px]';
         if (c.logo) {
           cell.innerHTML = pictureHTML(c.logo, {
             alt: c.name,
             srcsetAvif: c.srcsetAvif, srcsetWebp: c.srcsetWebp,
             sizes: SIZES.logo,
-            className: 'max-h-16 max-w-[140px] object-contain opacity-70 hover:opacity-100 transition-opacity'
+            className: 'w-auto max-w-full object-contain opacity-70 hover:opacity-100 transition-opacity',
+            style: `max-height:${fs * 2.2}px`
           });
         } else {
-          cell.innerHTML = `<span class="font-serif text-xl md:text-2xl italic t-text-soft">${escapeHtml(c.name)}</span>`;
+          cell.innerHTML = `<span class="font-serif italic t-text-soft text-center leading-tight" style="font-size:${fs}px">${escapeHtml(c.name)}</span>`;
         }
         grid.appendChild(cell);
       });
@@ -767,7 +782,8 @@
       return `<picture>${sources}<img src="${escapeAttr(src)}" alt="${escapeAttr(o.alt || '')}"${dims}` +
              ` loading="${o.eager ? 'eager' : 'lazy'}" decoding="async"` +
              (o.eager ? ' fetchpriority="high"' : '') +
-             (o.className ? ` class="${escapeAttr(o.className)}"` : '') + ` /></picture>`;
+             (o.className ? ` class="${escapeAttr(o.className)}"` : '') +
+             (o.style ? ` style="${escapeAttr(o.style)}"` : '') + ` /></picture>`;
     }
 
     /* ---------- Portfolio filter ---------- */

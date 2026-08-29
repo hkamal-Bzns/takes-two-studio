@@ -1617,6 +1617,19 @@ function SiteTab() {
         <Field label="Clients subtext">
           <input value={settings.clientsSubtext || ""} onChange={e => set("clientsSubtext", e.target.value)} className="adm-field" placeholder="Brands and publications we've worked with." />
         </Field>
+        <Field label="Clients font size (px)">
+          <input
+            type="number" min={10} max={48} step={1}
+            value={settings.clientsFontSize ?? ""}
+            onChange={e => set("clientsFontSize", e.target.value)}
+            className="adm-field"
+            placeholder="18"
+          />
+          <p className="text-white/30 text-[11px] mt-1">
+            Size of the client names in the grid. Logos scale with it, so the two kinds of cell stay
+            consistent. Leave blank for the default of 18px; values are clamped to 10–48.
+          </p>
+        </Field>
         <Field label="Contact eyebrow">
           <input value={settings.contactEyebrow || ""} onChange={e => set("contactEyebrow", e.target.value)} className="adm-field" placeholder="Get in Touch" />
         </Field>
@@ -1692,6 +1705,29 @@ function ClientsTab() {
     }
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } })
+  );
+
+  /** Drag order becomes the order on the public grid. Optimistic, then saved. */
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = clients.findIndex(c => c.id === active.id);
+    const newIndex = clients.findIndex(c => c.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(clients, oldIndex, newIndex);
+    setClients(next);
+    const r = await fetch(API("/clients/reorder"), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: next.map(c => c.id) }),
+    });
+    if (!r.ok) alert("Could not save the new order.");
+    refreshRef.current();
+  }
+
   if (loading) return <p className="text-white/50">Loading…</p>;
 
   return (
@@ -1721,27 +1757,70 @@ function ClientsTab() {
       {clients.length === 0 ? (
         <p className="text-white/50">No clients yet. Add one above.</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {clients.map((c, i) => (
-            <div key={c.id} className="border border-white/10 p-4 flex items-center gap-3">
-              <span className="text-[10px] tracking-[0.2em] uppercase text-white/30">{String(i + 1).padStart(2, "0")}</span>
-              {c.logo ? (
-                <img src={c.logo} alt={c.name} className="w-12 h-12 object-contain bg-white/5 p-1" />
-              ) : (
-                <div className="w-12 h-12 flex items-center justify-center bg-white/5 font-serif text-lg italic text-white/60">{c.name.charAt(0)}</div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-serif text-lg truncate">{c.name}</p>
-                <label className="text-[9px] tracking-[0.2em] uppercase text-white/30 cursor-pointer hover:text-white/60">
-                  Upload logo
-                  <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files && uploadLogo(c.id, e.target.files[0])} />
-                </label>
+        <>
+          <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-3">
+            Drag ⠿ to reorder — this is the order they appear on the public grid
+          </p>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={clients.map(c => c.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {clients.map((c, i) => (
+                  <SortableClientCard
+                    key={c.id}
+                    c={c}
+                    index={i}
+                    onRemove={remove}
+                    onUploadLogo={uploadLogo}
+                  />
+                ))}
               </div>
-              <button onClick={() => remove(c.id)} className="text-white/40 hover:text-red-400 text-lg px-1">×</button>
-            </div>
-          ))}
-        </div>
+            </SortableContext>
+          </DndContext>
+        </>
       )}
+    </div>
+  );
+}
+
+/* Client row, draggable by its ⠿ grip. The grip carries the listeners rather
+   than the card, so the delete button and the upload-logo file input keep
+   working — a card-wide drag would swallow both. */
+function SortableClientCard({ c, index, onRemove, onUploadLogo }: {
+  c: Client;
+  index: number;
+  onRemove: (id: string) => void;
+  onUploadLogo: (id: string, file: File) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: c.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="border border-white/10 p-4 flex items-center gap-3">
+      <button
+        {...attributes}
+        {...listeners}
+        aria-label={`Reorder ${c.name}`}
+        title="Drag to reorder"
+        className="flex-shrink-0 px-1 text-white/30 hover:text-white/80 cursor-grab active:cursor-grabbing touch-none"
+      >⠿</button>
+      <span className="text-[10px] tracking-[0.2em] uppercase text-white/30">{String(index + 1).padStart(2, "0")}</span>
+      {c.logo ? (
+        <img src={c.logo} alt={c.name} loading="lazy" decoding="async" className="w-12 h-12 object-contain bg-white/5 p-1" draggable={false} />
+      ) : (
+        <div className="w-12 h-12 flex items-center justify-center bg-white/5 font-serif text-lg italic text-white/60">{c.name.charAt(0)}</div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="font-serif text-lg truncate">{c.name}</p>
+        <label className="text-[9px] tracking-[0.2em] uppercase text-white/30 cursor-pointer hover:text-white/60">
+          Upload logo
+          <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files && onUploadLogo(c.id, e.target.files[0])} />
+        </label>
+      </div>
+      <button onClick={() => onRemove(c.id)} className="text-white/40 hover:text-red-400 text-lg px-1">×</button>
     </div>
   );
 }
