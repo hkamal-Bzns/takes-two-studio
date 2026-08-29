@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile, readdir, stat } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
@@ -44,6 +44,20 @@ export const AVIF_ONLY_WIDTHS: ReadonlySet<number> = new Set([4500]);
 
 const AVIF_QUALITY = 60; // AVIF is perceptually stronger; 60 ≈ WebP 84
 const WEBP_QUALITY = 84;
+
+/**
+ * The large rungs are the ones anyone actually inspects — the hero fills the
+ * viewport with them and the lightbox loads the widest on zoom — so they get a
+ * higher AVIF quality than the browsing sizes.
+ *
+ * 60 is right for a 640px thumbnail and visibly thin at 4500px on a good
+ * display. The widths below 2400 are unchanged: raising them would cost
+ * bandwidth on every grid view for a difference nobody sees at that size.
+ */
+const AVIF_QUALITY_LARGE = 72;
+const LARGE_RUNG_FROM = 2400;
+const avifQualityFor = (width: number) =>
+  width >= LARGE_RUNG_FROM ? AVIF_QUALITY_LARGE : AVIF_QUALITY;
 
 /** Reject anything over this. A 3200px master lands well under it. */
 export const MAX_UPLOAD_BYTES = 80 * 1024 * 1024; // 80 MB
@@ -139,7 +153,7 @@ export async function processUpload(buf: Buffer, originalName: string): Promise<
       // below are what govern how the image looks. Dropping 4 -> 2 measured 6x
       // faster on this hardware with the output marginally *smaller*.
       const avifBuf = await base()
-        .avif({ quality: AVIF_QUALITY, chromaSubsampling: "4:4:4", effort: 2 })
+        .avif({ quality: avifQualityFor(width), chromaSubsampling: "4:4:4", effort: 2 })
         .toBuffer();
 
       // The zoom rung is AVIF only — see AVIF_ONLY_WIDTHS. Skipping WebP here is
@@ -190,6 +204,112 @@ export async function processUpload(buf: Buffer, originalName: string): Promise<
  * A null `srcsetAvif` is the agreed signal for "no derivatives exist, render
  * the plain url" — every reader keys off that rather than off missing keys.
  */
+/**
+ * The bundle id inside a derivative url, or null if it is not one of ours.
+ * `/api/media/derivatives/<id>/3200.webp` -> `<id>`.
+ *
+ * The bundle id and the master's filename are the same value — processUpload
+ * uses one uuid for both — so this is also how you find an image's original.
+ */
+export function bundleIdFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = url.match(/\/api\/media\/derivatives\/([0-9a-fA-F-]{36})\//);
+  return m ? m[1] : null;
+}
+
+/** The master file on disk for a bundle id, or null when there is none. */
+export async function findMaster(
+  bundleId: string
+): Promise<{ absPath: string; url: string; bytes: number } | null> {
+  const dir = path.join(mediaRoot(), "masters");
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return null;
+  }
+  // Extensions vary (jpg/png/webp/…), so match on the id rather than guessing.
+  const name = entries.find((f) => f.startsWith(bundleId + "."));
+  if (!name) return null;
+  const absPath = path.join(dir, name);
+  const info = await stat(absPath);
+  return { absPath, url: `/api/media/masters/${name}`, bytes: info.size };
+}
+
+export type RegenerateResult = DerivativeFields & {
+  bundleId: string;
+  master: { url: string; bytes: number; width: number; height: number };
+  wrote: number;
+};
+
+/**
+ * Re-encode a bundle's derivatives from its master, in place.
+ *
+ * In place matters: OverviewItem rows and Project.coverImage both reference
+ * derivative urls as plain strings. Writing a new bundle id would leave every
+ * one of those pointing at the old files, so the same id is reused and the
+ * files are overwritten. Callers therefore do not need to update any url.
+ *
+ * Throws if the bundle has no master — regeneration never invents an original,
+ * and never re-encodes a derivative into another derivative.
+ */
+export async function regenerateBundle(bundleId: string): Promise<RegenerateResult> {
+  const master = await findMaster(bundleId);
+  if (!master) throw new Error(`no master on file for ${bundleId}`);
+
+  const buf = await readFile(master.absPath);
+  const meta = await sharp(buf, { failOn: "none" }).metadata();
+  if (!meta.width || !meta.height) throw new Error(`unreadable master for ${bundleId}`);
+
+  const derivDir = path.join(mediaRoot(), "derivatives", bundleId);
+  await mkdir(derivDir, { recursive: true });
+
+  const widths = DERIVATIVE_WIDTHS.filter((w) => w <= meta.width!);
+  if (widths.length === 0) widths.push(meta.width as never);
+
+  const encoded = await Promise.all(
+    widths.map(async (width) => {
+      const base = () =>
+        sharp(buf, { failOn: "none" })
+          .rotate()
+          .resize({ width, withoutEnlargement: true })
+          .withIccProfile("srgb");
+      const avifBuf = await base()
+        .avif({ quality: avifQualityFor(width), chromaSubsampling: "4:4:4", effort: 2 })
+        .toBuffer();
+      const webpBuf = AVIF_ONLY_WIDTHS.has(width)
+        ? null
+        : await base().webp({ quality: WEBP_QUALITY, smartSubsample: true }).toBuffer();
+      return { width, avifBuf, webpBuf };
+    })
+  );
+
+  const avif: Derivative[] = [];
+  const webp: Derivative[] = [];
+  let wrote = 0;
+  for (const { width, avifBuf, webpBuf } of encoded) {
+    await writeFile(path.join(derivDir, `${width}.avif`), avifBuf);
+    avif.push({ width, url: `/api/media/derivatives/${bundleId}/${width}.avif`, bytes: avifBuf.length });
+    wrote++;
+    if (webpBuf) {
+      await writeFile(path.join(derivDir, `${width}.webp`), webpBuf);
+      webp.push({ width, url: `/api/media/derivatives/${bundleId}/${width}.webp`, bytes: webpBuf.length });
+      wrote++;
+    }
+  }
+
+  const srcset = (list: Derivative[]) => list.map((d) => `${d.url} ${d.width}w`).join(", ");
+  return {
+    bundleId,
+    srcsetAvif: srcset(avif),
+    srcsetWebp: srcset(webp),
+    width: meta.width,
+    height: meta.height,
+    master: { url: master.url, bytes: master.bytes, width: meta.width, height: meta.height },
+    wrote,
+  };
+}
+
 export type DerivativeFields = {
   srcsetAvif: string | null;
   srcsetWebp: string | null;
@@ -213,4 +333,33 @@ export function pickDerivatives(body: unknown): DerivativeFields {
     width: num(b.width),
     height: num(b.height),
   };
+}
+
+/**
+ * The master-file columns. Kept separate from pickDerivatives because only
+ * ProjectImage carries them — Project has no master, its cover points at an
+ * image that does.
+ */
+export type MasterFields = {
+  masterUrl: string | null;
+  masterBytes: number | null;
+};
+
+export function pickMaster(body: unknown): MasterFields {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const master = (b.master ?? {}) as Record<string, unknown>;
+  // Accept either a flat masterUrl/masterBytes or the manifest's nested
+  // `master` object, so callers can pass an upload manifest straight through.
+  const url = typeof b.masterUrl === "string" && b.masterUrl.trim() !== ""
+    ? b.masterUrl
+    : typeof master.url === "string" && master.url.trim() !== ""
+      ? master.url
+      : null;
+  const rawBytes = b.masterBytes ?? master.bytes;
+  const bytes =
+    typeof rawBytes === "number" && Number.isFinite(rawBytes) && rawBytes > 0
+      ? Math.round(rawBytes)
+      : null;
+  // Bytes without a url is meaningless; never store a half-record.
+  return url ? { masterUrl: url, masterBytes: bytes } : { masterUrl: null, masterBytes: null };
 }

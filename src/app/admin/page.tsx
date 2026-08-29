@@ -21,7 +21,25 @@ type Derivatives = {
   width?: number | null;
   height?: number | null;
 };
-type Image = { id: string; url: string; caption: string | null; order: number } & Derivatives;
+type Image = {
+  id: string;
+  url: string;
+  caption: string | null;
+  order: number;
+  /** The untouched upload, when one exists. Null for images that arrived as
+   *  pre-built derivatives — an original cannot be recovered from those. */
+  masterUrl?: string | null;
+  masterBytes?: number | null;
+  /** "Sharpest": serve the original at full size in the zoomed lightbox. */
+  useMaster?: boolean;
+} & Derivatives;
+
+/** Human-readable file size for the admin, e.g. "7.2 MB". */
+function fmtBytes(n?: number | null): string {
+  if (!n || n <= 0) return "—";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(0) + " KB";
+  return (n / 1048576).toFixed(1) + " MB";
+}
 type Project = {
   id: string;
   title: string;
@@ -815,6 +833,12 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
 
   // Saved rows first, then anything still waiting to attach.
   const gallery = [...images, ...staged];
+  // Images that arrived as pre-built derivatives have no original and cannot
+  // get one automatically. Filtering to them is how you work through the ones
+  // that actually matter rather than hunting through the whole grid.
+  const [onlyMissingMaster, setOnlyMissingMaster] = useState(false);
+  const missingMasterCount = images.filter(i => !i.masterUrl).length;
+  const visibleGallery = onlyMissingMaster ? gallery.filter(i => !i.masterUrl && !isStaged(i.id)) : gallery;
 
   async function saveProject(): Promise<string | null> {
     // coverDerivatives is set when the cover came from the pipeline. Sending
@@ -892,6 +916,42 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
       width: img.width ?? null,
       height: img.height ?? null,
     });
+  }
+
+  /** Flip one image between Compressed and Sharpest. */
+  async function setUseMaster(img: Image, next: boolean) {
+    if (!pid || isStaged(img.id)) return;
+    const r = await fetch(API(`/projects/${pid}/images/${img.id}`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ useMaster: next }),
+    });
+    if (!r.ok) {
+      const msg = await r.json().then(j => j?.error).catch(() => null);
+      alert(msg || "Could not change the quality setting.");
+      return;
+    }
+    setImages(list => list.map(i => (i.id === img.id ? { ...i, useMaster: next } : i)));
+  }
+
+  /** Attach the studio's original to an image that has none, then re-encode it. */
+  async function attachMaster(img: Image, file: File) {
+    if (!pid || isStaged(img.id)) return;
+    setProgress(`Uploading original for ${img.id.slice(0, 6)}…`);
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch(API(`/projects/${pid}/images/${img.id}/master`), { method: "POST", body: fd });
+    setProgress(null);
+    if (!r.ok) {
+      const msg = await r.json().then(j => j?.error).catch(() => null);
+      alert(msg || "Could not attach the original.");
+      return;
+    }
+    // Derivatives were rebuilt in place, so the urls are unchanged — but the
+    // srcsets and master fields are new, and the browser is holding the old
+    // pixels for those urls. Refetch the row and let the cache sort itself out.
+    const j = await fetch(API(`/projects/${pid}`)).then(x => x.json());
+    setImages(j.project?.images || []);
   }
 
   async function removeImage(imgId: string) {
@@ -1038,17 +1098,38 @@ function ProjectEditor({ project, onClose }: { project: Project | null; onClose:
                 {staged.length} image{staged.length > 1 ? "s" : ""} ready — added when you press Create Project.
               </p>
             )}
-            {gallery.length > 0 ? (
+            {missingMasterCount > 0 && (
+              <div className="flex items-center gap-3 mb-3 flex-wrap">
+                <button
+                  onClick={() => setOnlyMissingMaster(v => !v)}
+                  aria-pressed={onlyMissingMaster}
+                  className={`text-[10px] tracking-[0.2em] uppercase px-3 py-1.5 border transition-colors ${
+                    onlyMissingMaster
+                      ? "bg-amber-500/90 text-black border-amber-500"
+                      : "border-white/20 text-white/60 hover:text-white hover:border-white/50"
+                  }`}
+                >{onlyMissingMaster ? "Showing missing originals" : `Missing original (${missingMasterCount})`}</button>
+                <span className="text-white/40 text-[11px]">
+                  {missingMasterCount} of {images.length} have no original on file — click a
+                  ⚠ badge to attach one.
+                </span>
+              </div>
+            )}
+            {onlyMissingMaster && visibleGallery.length === 0 ? (
+              <p className="text-white/50 text-sm">Every image in this project has its original.</p>
+            ) : visibleGallery.length > 0 ? (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={gallery.map(i => i.id)} strategy={rectSortingStrategy}>
+                <SortableContext items={visibleGallery.map(i => i.id)} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-3 gap-3">
-                    {gallery.map(img => (
+                    {visibleGallery.map(img => (
                       <SortableImage
                         key={img.id}
                         img={img}
                         isCover={!!coverImage && img.url === coverImage}
                         onRemove={removeImage}
                         onSetCover={setAsCover}
+                        onSetUseMaster={setUseMaster}
+                        onAttachMaster={attachMaster}
                       />
                     ))}
                   </div>
@@ -1080,11 +1161,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /* ---------------- Sortable Image (drag-to-reorder) ---------------- */
-function SortableImage({ img, isCover, onRemove, onSetCover }: {
+function SortableImage({ img, isCover, onRemove, onSetCover, onSetUseMaster, onAttachMaster }: {
   img: Image;
   isCover: boolean;
   onRemove: (id: string) => void;
   onSetCover: (img: Image) => void;
+  onSetUseMaster: (img: Image, next: boolean) => void;
+  onAttachMaster: (img: Image, file: File) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: img.id });
   const style: React.CSSProperties = {
@@ -1109,6 +1192,37 @@ function SortableImage({ img, isCover, onRemove, onSetCover }: {
         onPointerDown={(e) => e.stopPropagation()}
         className="absolute top-1 right-1 bg-black/70 text-white w-6 h-6 text-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
       >×</button>
+      {/* Quality state. A missing original is a fact about the image, not a
+          failure, so it is stated plainly and offers the fix inline. */}
+      {!isStaged(img.id) && (
+        img.masterUrl ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onSetUseMaster(img, !img.useMaster); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            title={
+              img.useMaster
+                ? `Sharpest — visitors get the original (${img.width ?? "?"}×${img.height ?? "?"}, ${fmtBytes(img.masterBytes)}) when they zoom`
+                : `Compressed — visitors get the derivatives. Original on file: ${img.width ?? "?"}×${img.height ?? "?"}, ${fmtBytes(img.masterBytes)}`
+            }
+            className={`absolute bottom-1 right-1 text-[8px] px-1.5 py-0.5 tracking-wide z-10 ${
+              img.useMaster ? "bg-emerald-400/90 text-black" : "bg-black/70 text-white/70 hover:text-white"
+            }`}
+          >{img.useMaster ? "◆ Sharpest" : "◇ Compressed"}</button>
+        ) : (
+          <label
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            title="No original on file — attach the studio's original to enable Sharpest and rebuild this image"
+            className="absolute bottom-1 right-1 bg-amber-500/90 text-black text-[8px] px-1.5 py-0.5 tracking-wide z-10 cursor-pointer hover:bg-amber-400"
+          >
+            ⚠ No original
+            <input
+              type="file" accept="image/*" className="hidden"
+              onChange={(e) => e.target.files && e.target.files[0] && onAttachMaster(img, e.target.files[0])}
+            />
+          </label>
+        )
+      )}
       {/* Cover control. The badge is status and always visible; the button
           follows the × pattern. Both stop pointer events reaching the wrapper,
           which carries the dnd-kit listeners — without that a click starts a
@@ -1605,6 +1719,8 @@ function SiteTab() {
         </Field>
       </div>
 
+      <RegeneratePanel />
+
       {/* Clients + Contact texts */}
       <div className="space-y-6 mb-10">
         <h3 className="text-[10px] tracking-[0.3em] uppercase text-white/40 pb-2 border-b border-white/10">Clients & Contact Text</h3>
@@ -1645,6 +1761,126 @@ function SiteTab() {
       >
         {saving ? "Saving…" : dirty ? "Save Changes" : "Saved"}
       </button>
+    </div>
+  );
+}
+
+/* ---------------- Image maintenance ----------------
+   Re-encodes derivatives from their masters so existing images pick up the
+   higher AVIF quality on the large rungs. Batched: one 4500px master is ~15s of
+   AVIF on this hosting, so a single request over the whole library would be
+   killed long before it finished. Regeneration is in place — same urls — so a
+   run stopped halfway leaves a consistent site. */
+function RegeneratePanel() {
+  const [stats, setStats] = useState<{ total: number; withMaster: number; withoutMaster: number } | null>(null);
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(0);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [failures, setFailures] = useState<{ id: string; error: string }[]>([]);
+  const [finished, setFinished] = useState(false);
+  const stopRef = useRef(false);
+
+  // Same shape as the other tabs: the loader is defined inside the effect and
+  // exposed through a ref, so nothing calls setState straight from the effect
+  // body.
+  const refreshRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const load = async () => {
+      const r = await fetch(API("/images/regenerate"), { cache: "no-store" });
+      if (r.ok) setStats(await r.json());
+    };
+    refreshRef.current = load;
+    load();
+  }, []);
+
+  async function linkExistingMasters() {
+    const r = await fetch(API("/images/regenerate"), { method: "PUT" });
+    const j = await r.json().catch(() => null);
+    alert(j ? `Scanned ${j.scanned} images, linked ${j.linked} original${j.linked === 1 ? "" : "s"}.` : "Scan failed.");
+    refreshRef.current();
+  }
+
+  async function run() {
+    setRunning(true); setDone(0); setFailures([]); setFinished(false); stopRef.current = false;
+    let cursor: string | null = null;
+    // Sequential by design: the point of batching is to stay inside the
+    // hosting's CPU budget, which parallel batches would defeat.
+    for (;;) {
+      if (stopRef.current) break;
+      const r = await fetch(API("/images/regenerate"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cursor }),
+      });
+      if (!r.ok) { alert("Regeneration failed — stopping."); break; }
+      const j = await r.json();
+      setDone(d => d + j.processed);
+      setRemaining(j.remaining);
+      if (j.failed?.length) setFailures(f => [...f, ...j.failed]);
+      cursor = j.cursor;
+      if (j.finished) { setFinished(true); break; }
+    }
+    setRunning(false);
+    refreshRef.current();
+  }
+
+  return (
+    <div className="space-y-4 mb-10">
+      <h3 className="text-[10px] tracking-[0.3em] uppercase text-white/40 pb-2 border-b border-white/10">Image Maintenance</h3>
+      <p className="text-white/50 text-sm max-w-xl">
+        Re-encodes existing images from their originals so they pick up the higher quality on the
+        large sizes. Runs in small batches; you can stop and resume at any time, and the site stays
+        consistent throughout because images keep their existing addresses.
+      </p>
+
+      {stats && (
+        <div className="flex gap-6 flex-wrap text-sm">
+          <span className="text-white/60">{stats.total} pipeline images</span>
+          <span className="text-emerald-400/90">{stats.withMaster} with an original</span>
+          <span className="text-amber-400/90">{stats.withoutMaster} without</span>
+        </div>
+      )}
+      {stats && stats.withoutMaster > 0 && (
+        <p className="text-amber-400/80 text-xs max-w-xl">
+          The {stats.withoutMaster} without an original are skipped — they arrived as finished
+          images and no original was ever on the server. Re-encoding those from their own output
+          would make them worse, not better. Attach originals from the project editor to bring them in.
+        </p>
+      )}
+
+      <div className="flex gap-3 flex-wrap items-center">
+        <button
+          onClick={run}
+          disabled={running || !stats || stats.withMaster === 0}
+          className="text-[11px] tracking-[0.2em] uppercase border border-white/30 px-4 py-2 hover:bg-white hover:text-black transition-colors disabled:opacity-40"
+        >{running ? "Regenerating…" : "Regenerate derivatives"}</button>
+        {running && (
+          <button
+            onClick={() => { stopRef.current = true; }}
+            className="text-[11px] tracking-[0.2em] uppercase border border-amber-400/50 text-amber-400 px-4 py-2 hover:bg-amber-400 hover:text-black transition-colors"
+          >Stop after this batch</button>
+        )}
+        <button
+          onClick={linkExistingMasters}
+          disabled={running}
+          className="text-[11px] tracking-[0.2em] uppercase text-white/50 hover:text-white disabled:opacity-40"
+        >Re-scan for originals</button>
+      </div>
+
+      {(running || done > 0) && (
+        <p className="text-white/60 text-sm">
+          {done} regenerated{remaining !== null && ` · ${remaining} to go`}
+          {finished && " · finished"}
+        </p>
+      )}
+      {failures.length > 0 && (
+        <div className="text-red-400/80 text-xs">
+          <p>{failures.length} failed:</p>
+          <ul className="list-disc pl-5">
+            {failures.slice(0, 5).map(f => <li key={f.id}>{f.id.slice(0, 8)} — {f.error}</li>)}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

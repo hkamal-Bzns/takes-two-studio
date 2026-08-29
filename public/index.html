@@ -1154,11 +1154,16 @@
        rung. Falls back to WebP, then to the stored url, via onerror. */
     function lightboxSources(img) {
       const viewWant = Math.min(3200, Math.round(window.innerWidth * (window.devicePixelRatio || 1)));
+      // "Sharpest" (useMaster) sends the untouched original for the zoomed
+      // view only. Opening still uses a browsing rung, so switching an image to
+      // Sharpest never makes the lightbox slower to open — it only changes what
+      // arrives when someone actually zooms in to inspect it.
+      const full = (img.useMaster && img.masterUrl) ? img.masterUrl : null;
       return {
         viewAvif: pickAtLeast(img.srcsetAvif, viewWant),
         viewWebp: pickAtLeast(img.srcsetWebp, viewWant),
-        fullAvif: largestFrom(img.srcsetAvif, ''),
-        fullWebp: largestFrom(img.srcsetWebp, ''),
+        fullAvif: full || largestFrom(img.srcsetAvif, ''),
+        fullWebp: full || largestFrom(img.srcsetWebp, ''),
         plain: img.url
       };
     }

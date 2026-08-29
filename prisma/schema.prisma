@@ -59,6 +59,17 @@ model ProjectImage {
   width      Int?
   height     Int?
 
+  // The untouched uploaded file, when one exists. Most rows have none: images
+  // that arrived as pre-built derivative bundles never had a master on this
+  // server, and it cannot be reconstructed from a derivative. Null here is the
+  // signal for "no original on file" throughout the admin.
+  masterUrl   String?
+  masterBytes Int?
+
+  // "Sharpest": serve `masterUrl` at full size instead of the widest
+  // derivative. Only meaningful when masterUrl is set; the readers check both.
+  useMaster   Boolean @default(false)
+
   @@index([projectId])
 }
 
