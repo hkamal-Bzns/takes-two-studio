@@ -575,10 +575,14 @@
       return s ? s.visible : true;
     }
     function navAction(key) {
-      if (key === 'overview' || key === 'advertising' || key === 'food-beverage') {
+      if (PORTFOLIO_KEYS.includes(key)) {
         return () => filterPortfolio(key);
       }
-      return () => showView(key + '-view');
+      // A section link leaves any project deep link behind, so drop the hash.
+      return () => {
+        if (location.hash) history.replaceState(null, '', location.pathname);
+        showView(key + '-view');
+      };
     }
 
     function renderNav() {
@@ -786,9 +790,53 @@
              (o.style ? ` style="${escapeAttr(o.style)}"` : '') + ` /></picture>`;
     }
 
+    /* ---------- Routing ----------
+       Each view has a real path, so the address bar stays meaningful and a
+       refresh returns to the same place. The server rewrites all of these to
+       this file (see SPA_PATHS in next.config.ts), so they are not redirects
+       and the URL the visitor sees is the URL they keep.
+
+       Projects stay on #project/<id>, which already worked and is already in
+       shared links; a project therefore reads as /advertising#project/<id>,
+       and a refresh now restores both the category and the project. */
+    const VIEW_PATHS = {
+      overview: '/',
+      advertising: '/advertising',
+      'food-beverage': '/food-beverage',
+      about: '/about',
+      contact: '/contact',
+      clients: '/clients',
+    };
+    const PORTFOLIO_KEYS = ['overview', 'advertising', 'food-beverage'];
+
+    /** Which view key a path refers to, or null if it is not one of ours. */
+    function keyFromPath(pathname) {
+      const clean = (pathname || '/').replace(/\/+$/, '') || '/';
+      for (const [key, path] of Object.entries(VIEW_PATHS)) {
+        if (path === clean) return key;
+      }
+      // /index.html is the pre-rewrite URL; treat it as the overview root so
+      // old links and bookmarks still land somewhere sensible.
+      if (clean === '/index.html') return 'overview';
+      return null;
+    }
+
+    /** Write a view into the address bar without reloading. */
+    function syncUrl(key, push) {
+      const path = VIEW_PATHS[key];
+      if (!path) return;
+      // Keep any #project/<id> so a project deep link survives a category sync.
+      const target = path + (location.hash.startsWith('#project/') ? location.hash : '');
+      if (location.pathname + location.hash === target) return;
+      if (push) history.pushState({ key }, '', target);
+      else history.replaceState({ key }, '', target);
+    }
+
     /* ---------- Portfolio filter ---------- */
-    async function filterPortfolio(category) {
+    async function filterPortfolio(category, opts) {
+      const o = opts || {};
       currentFilter = category;
+      if (o.silent !== true) syncUrl(category, o.push !== false);
       const label = document.getElementById('filter-label');
       if (label) label.textContent = labelFor(category);
       showView('portfolio-view');
@@ -997,10 +1045,18 @@
     }
 
     /* ---------- SPA routing ---------- */
-    function showView(viewId) {
+    function showView(viewId, opts) {
+      const o = opts || {};
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       const target = document.getElementById(viewId);
       if (!target) return;
+      // Section views own their own path. portfolio-view is handled by
+      // filterPortfolio (it knows the category) and project-view by the
+      // #project/<id> hash, so neither is synced from here.
+      const sectionKey = viewId.endsWith('-view') ? viewId.slice(0, -'-view'.length) : null;
+      if (o.silent !== true && sectionKey && VIEW_PATHS[sectionKey] && !PORTFOLIO_KEYS.includes(sectionKey)) {
+        syncUrl(sectionKey, o.push !== false);
+      }
       requestAnimationFrame(() => {
         target.classList.add('active');
         runReveals(target);
@@ -1405,15 +1461,37 @@
         renderClients();
         applySiteSettings();
       } catch (e) { console.warn('settings load failed', e); }
-      // If the URL has a #project/<id> hash, open that project directly (new-tab support)
-      if (location.hash && location.hash.startsWith('#project/')) {
-        // load the portfolio first, then open the project
-        await filterPortfolio('overview');
-        handleHashRoute();
-      } else {
-        filterPortfolio('overview');
-      }
+      // Restore whatever the URL asks for. Without this a refresh on any
+      // category dropped the visitor back on Overview, because nothing but
+      // #project/<id> was ever read back off the URL.
+      await routeFromUrl({ push: false });
     });
+
+    /**
+     * Show whatever the current URL describes.
+     * `push:false` on first load and on back/forward, so restoring a view does
+     * not itself add a history entry.
+     */
+    async function routeFromUrl(opts) {
+      const o = opts || {};
+      const key = keyFromPath(location.pathname);
+      const isProject = location.hash.startsWith('#project/');
+
+      if (PORTFOLIO_KEYS.includes(key)) {
+        await filterPortfolio(key, { push: o.push });
+      } else if (key) {
+        showView(key + '-view', { push: o.push });
+      } else {
+        // An unknown path: show the overview and correct the address bar.
+        await filterPortfolio('overview', { push: false });
+      }
+
+      // A project deep link sits on top of whichever category it came from.
+      if (isProject) handleHashRoute();
+    }
+
+    // Back / forward through the categories and sections.
+    window.addEventListener('popstate', () => { routeFromUrl({ push: false }); });
   </script>
 </body>
 </html>
